@@ -39,6 +39,9 @@ make verify     # lint (gdlint) + test + export; é o gate de PR
 
 ## Gotchas
 
+- Rode `make import` (`godot --headless --path . --import`) antes de testar ou exportar num clone novo: sem isso o GUT não importa os `class_name` e reporta "Nothing was run".
+- O GUT só coleta arquivos com prefixo `test_`; para varrer subpastas use `-ginclude_subdirs`.
+- A imagem `barichello/godot-ci` não traz `python3` nem `make`: o workflow instala os dois via apt antes do gdtoolkit e do `make verify`.
 - Export web com threads exige `SharedArrayBuffer` e headers COOP/COEP; o Vercel não os dá por padrão — exporte **single-threaded**.
 - Export templates precisam existir em `~/Library/Application Support/Godot/export_templates/<versão>`; sem eles o `--export-release` falha.
 - GUT headless precisa de `-gexit` ou o processo nunca termina.
