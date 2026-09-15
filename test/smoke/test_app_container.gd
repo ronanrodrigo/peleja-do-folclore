@@ -3,6 +3,7 @@ extends GutTest
 ## nao guarda estado de jogo. Usa explicitamente o modo `sample`.
 
 const CONTAINER_SCRIPT := "res://autoloads/app_container.gd"
+const CONTAINER := preload("res://autoloads/app_container.gd")
 const SAMPLE_ENV := "sample"
 const CAPABILITIES := ["input", "render", "asset", "audio", "persistence"]
 const GAME_STATE_PROPERTIES := ["health", "round", "selection", "progress"]
@@ -56,23 +57,41 @@ func test_container_holds_no_game_state() -> void:
 
 func test_capabilities_without_production_adapter_are_reported() -> void:
 	var missing: Array = _container.missing_production()
-	for capability in CAPABILITIES:
-		assert_true(
-			capability in missing,
-			"capacidade ainda sem adapter de producao: %s" % capability
+	for capability in missing:
+		assert_false(
+			ResourceLoader.exists(CONTAINER.PRODUCTION_ADAPTERS[capability]),
+			"capacidade reportada sem producao realmente nao tem adapter: %s" % capability
 		)
+	for capability in CAPABILITIES:
+		if not missing.has(capability):
+			assert_true(
+				ResourceLoader.exists(CONTAINER.PRODUCTION_ADAPTERS[capability]),
+				"capacidade fora da lista de faltantes tem adapter de producao: %s" % capability
+			)
 
 
-func test_live_mode_falls_back_to_sample_while_production_is_missing() -> void:
+func test_asset_capability_already_has_a_production_adapter() -> void:
+	assert_false(
+		_container.missing_production().has("asset"),
+		"o asset-gateway de producao existe desde o ticket 9"
+	)
+
+
+func test_live_mode_uses_the_production_adapter_where_it_exists() -> void:
 	OS.set_environment("PELEJA_ADAPTERS", "live")
 	var live_container: Variant = load(CONTAINER_SCRIPT).new()
 	live_container.name = "live_app_container"
 	add_child_autofree(live_container)
 	assert_eq(live_container.mode(), "live", "modo live e explicito")
 	assert_true(live_container.is_wired(), "modo live ainda injeta as cinco capacidades")
-	assert_eq(
-		live_container.origin("asset"),
-		SAMPLE_ENV,
-		"sem adapter de producao, a origem registrada e sample"
-	)
+	var missing: Array = live_container.missing_production()
+	for capability in CAPABILITIES:
+		var expected: String = SAMPLE_ENV if missing.has(capability) else "live"
+		assert_eq(
+			live_container.origin(capability),
+			expected,
+			"origem do adapter de %s segue a existencia do adapter de producao" % capability
+		)
+	assert_eq(live_container.origin("asset"), "live", "asset usa o adapter de producao")
+	assert_true(live_container.asset_gateway() is AssetGateway, "gateway de asset injetado")
 	OS.set_environment("PELEJA_ADAPTERS", SAMPLE_ENV)

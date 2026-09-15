@@ -19,6 +19,12 @@ const PROMPT_PIXEL_SCALE := 2
 const BLINK_INTERVAL := 0.55
 const HORIZON_Y := 196
 
+## Slug da arte gerada usada como fundo (assets/generated/backgrounds/forest-arena.png).
+const BACKDROP_SLUG := "forest-arena"
+
+const BACKDROP_SOURCE_GENERATED := "generated"
+const BACKDROP_SOURCE_CODE := "code"
+
 const TITLE_TEXT := "PELEJA DO FOLCLORE"
 const PROMPT_TEXT := "PRESSIONE PARA COMEÇAR"
 const STARTED_TEXT := "LUTA EM BREVE"
@@ -84,6 +90,7 @@ const FONT_GLYPHS := {
 
 var _started: bool = false
 var _blink_elapsed: float = 0.0
+var _backdrop_source: String = BACKDROP_SOURCE_CODE
 
 var _title_texture: TextureRect
 var _prompt_text: TextureRect
@@ -164,13 +171,18 @@ func _apply_root_layout() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+## Fundo da tela de titulo.
+##
+## A arte gerada por ComfyUI (slug `forest-arena`, carregada pelo asset-gateway)
+## entra quando existe; sem ela, o desenho em codigo assume. O jogo nunca quebra
+## por arte ausente (ADR 0005).
 func _build_backdrop() -> void:
-	var image := Image.create_empty(BASE_WIDTH, BASE_HEIGHT, false, Image.FORMAT_RGBA8)
-	image.fill(COLOR_SKY)
-	_paint_stars(image)
-	_paint_hills(image, 26, COLOR_HILLS_BACK)
-	_paint_hills(image, 14, COLOR_HILLS_FRONT)
-	image.fill_rect(Rect2i(0, HORIZON_Y, BASE_WIDTH, BASE_HEIGHT - HORIZON_Y), COLOR_GROUND)
+	var image := _load_generated_backdrop()
+	if image == null:
+		image = _build_code_backdrop()
+		_backdrop_source = BACKDROP_SOURCE_CODE
+	else:
+		_backdrop_source = BACKDROP_SOURCE_GENERATED
 	var node := TextureRect.new()
 	node.name = "Backdrop"
 	node.texture = ImageTexture.create_from_image(image)
@@ -181,6 +193,36 @@ func _build_backdrop() -> void:
 	node.position = Vector2.ZERO
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(node)
+
+
+## De onde veio o fundo ("generated" ou "code") -- usado por teste e evidencia.
+func backdrop_source() -> String:
+	return _backdrop_source
+
+
+## Arte gerada por slug, via asset-gateway injetado. Null quando nao existe.
+func _load_generated_backdrop() -> Image:
+	var container: Variant = get_node_or_null("/root/app_container")
+	if container == null or not container.has_method("asset_gateway"):
+		return null
+	var gateway: Variant = container.asset_gateway()
+	if gateway == null:
+		return null
+	var pixels: PackedByteArray = gateway.load_panel(BACKDROP_SLUG, PackedByteArray())
+	if pixels.size() != BASE_WIDTH * BASE_HEIGHT * 4:
+		return null
+	return Image.create_from_data(BASE_WIDTH, BASE_HEIGHT, false, Image.FORMAT_RGBA8, pixels)
+
+
+## Fallback em codigo: ceu, mata em silhueta e chao. Layout 100% deterministico.
+func _build_code_backdrop() -> Image:
+	var image := Image.create_empty(BASE_WIDTH, BASE_HEIGHT, false, Image.FORMAT_RGBA8)
+	image.fill(COLOR_SKY)
+	_paint_stars(image)
+	_paint_hills(image, 26, COLOR_HILLS_BACK)
+	_paint_hills(image, 14, COLOR_HILLS_FRONT)
+	image.fill_rect(Rect2i(0, HORIZON_Y, BASE_WIDTH, BASE_HEIGHT - HORIZON_Y), COLOR_GROUND)
+	return image
 
 
 ## Cielo estrelado deterministico -- nada de aleatoriedade, o layout e dado.

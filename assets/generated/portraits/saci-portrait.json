@@ -1,0 +1,58 @@
+{
+  "slug": "saci-portrait",
+  "kind": "portraits",
+  "role": "Retrato do Saci (folclore brasileiro)",
+  "asset": "res://assets/generated/portraits/saci-portrait.png",
+  "prompt": "A detailed 16-bit retro pixel art illustration in 16:9 widescreen aspect ratio.\nVisual Style:\nAesthetic: Crisp 16-bit arcade / Super Nintendo style pixel art.\nPixel Grid: Strictly uniform pixel-to-canvas ratio across all elements (character, foreground, background, and UI/text elements). No sub-pixel alignment, no mixed resolution, no modern smooth gradients or vector filters.\nLinework & Shading: Clean dark pixel outlines, vibrant color palette, retro dithering for sky/texture gradients, and sharp localized shading.\nInput Context:\nMode: DESCRIÇÃO\nSubject Details: Character: a mischievous dark-skinned boy, wearing a bright red pointed cap and a red scarf, big grin, arms crossed, bust portrait from the shoulders up\nPose/Action: standing still in a heroic front-facing pose\nEnvironment:\nSetting: a dense forest\nBackground Elements: layered mountains and trees\nMood/Lighting: Golden hour sunset light with warm dithering, nostalgic retro video game atmosphere.\nUI Elements: None, keep the scene clean with no UI or text",
+  "prompt_fields": {
+    "PROPORCAO": "16:9 widescreen",
+    "MODO": "DESCRIÇÃO",
+    "SUJEITO": "Character: a mischievous dark-skinned boy, wearing a bright red pointed cap and a red scarf, big grin, arms crossed, bust portrait from the shoulders up",
+    "POSE": "standing still in a heroic front-facing pose",
+    "CENARIO": "a dense forest",
+    "ELEMENTOS": "layered mountains and trees",
+    "MOOD": "Golden hour sunset light with warm dithering",
+    "UI": "None, keep the scene clean with no UI or text"
+  },
+  "prompt_field_notes": {
+    "POSE": "opcao literal do questionario (pose heroica parada, de frente)",
+    "CENARIO": "opcao literal do questionario (floresta)",
+    "ELEMENTOS": "opcao literal do questionario (montanhas + arvores)",
+    "MOOD": "opcao literal do questionario (por do sol dourado)",
+    "UI": "opcao literal do questionario (sem UI)",
+    "SUJEITO": "campo livre: figura do folclore, nenhuma pessoa real (ADR 0004)"
+  },
+  "negative_prompt": "antialiasing, smooth vector shapes, 3D render, photorealism, mixed pixel resolutions, blurry pixels, watermark, signature, text artifacts, jpeg compression noise",
+  "prompt_source": "skill rrn:pixel-art (template e prompt negativo verbatim)",
+  "seed": 42,
+  "generation": {
+    "width": 512,
+    "height": 288,
+    "steps": 28,
+    "cfg": 7.0,
+    "sampler_name": "dpmpp_2m",
+    "scheduler": "karras",
+    "workflow": "tools/comfy/workflows/pixelart_bg.json",
+    "prompt_id": "978332d3-7187-4d0c-9cc8-dcf2c9507c56",
+    "host": "http://127.0.0.1:8188",
+    "generated_at": "2026-09-15T23:36:11+00:00"
+  },
+  "model": "v1-5-pruned-emaonly.safetensors",
+  "model_license": "CreativeML Open RAIL-M",
+  "model_source_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors",
+  "model_card_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5",
+  "generated_with": "ComfyUI 0.36.0 local (Apple M4, 16 GB unificados, backend MPS)",
+  "postprocess": {
+    "script": "tools/comfy/postprocess.py",
+    "size": [
+      426,
+      240
+    ],
+    "colors": 32,
+    "max_colors": 32,
+    "resample": "NEAREST",
+    "palette": "assets/palettes/peleja.json",
+    "sha256": "501c9b165de0281751673ffc81aba76eb61d58064e6f18ff95c039298aed9f30"
+  },
+  "policy": "sem pessoa real, sem simbolo real e sem referencia religiosa (ADR 0004)"
+}

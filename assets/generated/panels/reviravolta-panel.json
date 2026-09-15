@@ -1,0 +1,57 @@
+{
+  "slug": "reviravolta-panel",
+  "kind": "panels",
+  "role": "Painel da Reviravolta: a mata toma a cena",
+  "asset": "res://assets/generated/panels/reviravolta-panel.png",
+  "prompt": "A detailed 16-bit retro pixel art illustration in 16:9 widescreen aspect ratio.\nVisual Style:\nAesthetic: Crisp 16-bit arcade / Super Nintendo style pixel art.\nPixel Grid: Strictly uniform pixel-to-canvas ratio across all elements (character, foreground, background, and UI/text elements). No sub-pixel alignment, no mixed resolution, no modern smooth gradients or vector filters.\nLinework & Shading: Clean dark pixel outlines, vibrant color palette, retro dithering for sky/texture gradients, and sharp localized shading.\nInput Context:\nMode: DESCRIÇÃO\nSubject Details: One full-bleed illustration: giant green leaves and thick wooden vines filling the whole frame, golden sunlight breaking through the dense forest canopy\nPose/Action: the vines surge upward and take over the frame, camera looking up\nEnvironment:\nSetting: a dense forest\nBackground Elements: layered mountains and trees, a big pixelated sun and chunky clouds\nMood/Lighting: Golden hour sunset light with warm dithering, nostalgic retro video game atmosphere.\nUI Elements: None, keep the scene clean with no UI or text",
+  "prompt_fields": {
+    "PROPORCAO": "16:9 widescreen",
+    "MODO": "DESCRIÇÃO",
+    "SUJEITO": "One full-bleed illustration: giant green leaves and thick wooden vines filling the whole frame, golden sunlight breaking through the dense forest canopy",
+    "POSE": "the vines surge upward and take over the frame, camera looking up",
+    "CENARIO": "a dense forest",
+    "ELEMENTOS": "layered mountains and trees, a big pixelated sun and chunky clouds",
+    "MOOD": "Golden hour sunset light with warm dithering",
+    "UI": "None, keep the scene clean with no UI or text"
+  },
+  "prompt_field_notes": {
+    "CENARIO": "opcao literal do questionario (floresta)",
+    "ELEMENTOS": "opcoes literais do questionario (montanhas + arvores, sol + nuvens)",
+    "MOOD": "opcao literal do questionario (por do sol dourado)",
+    "UI": "opcao literal do questionario (sem UI)",
+    "SUJEITO": "campo livre: a mata tomando a cena, sem pessoa, simbolo ou religiao (ADR 0004)"
+  },
+  "negative_prompt": "antialiasing, smooth vector shapes, 3D render, photorealism, mixed pixel resolutions, blurry pixels, watermark, signature, text artifacts, jpeg compression noise",
+  "prompt_source": "skill rrn:pixel-art (template e prompt negativo verbatim)",
+  "seed": 7,
+  "generation": {
+    "width": 512,
+    "height": 288,
+    "steps": 28,
+    "cfg": 7.0,
+    "sampler_name": "dpmpp_2m",
+    "scheduler": "karras",
+    "workflow": "tools/comfy/workflows/pixelart_bg.json",
+    "prompt_id": "921fc2ad-afc6-4c31-a20f-bc09acc612ac",
+    "host": "http://127.0.0.1:8188",
+    "generated_at": "2026-09-15T23:35:58+00:00"
+  },
+  "model": "v1-5-pruned-emaonly.safetensors",
+  "model_license": "CreativeML Open RAIL-M",
+  "model_source_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors",
+  "model_card_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5",
+  "generated_with": "ComfyUI 0.36.0 local (Apple M4, 16 GB unificados, backend MPS)",
+  "postprocess": {
+    "script": "tools/comfy/postprocess.py",
+    "size": [
+      426,
+      240
+    ],
+    "colors": 30,
+    "max_colors": 32,
+    "resample": "NEAREST",
+    "palette": "assets/palettes/peleja.json",
+    "sha256": "cd0d201f56751750886671b179434018259bfa9b632b38bc22f2abb123ef78e2"
+  },
+  "policy": "sem pessoa real, sem simbolo real e sem referencia religiosa (ADR 0004)"
+}
