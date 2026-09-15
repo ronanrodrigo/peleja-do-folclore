@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: make verify (gdlint + GUT headless + export web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: barichello/godot-ci:4.7.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar export templates na HOME do job
+        run: |
+          set -eux
+          mkdir -p "${HOME}/.local/share/godot/export_templates"
+          if [ -d /root/.local/share/godot/export_templates ]; then
+            cp -a /root/.local/share/godot/export_templates/. \
+              "${HOME}/.local/share/godot/export_templates/"
+          fi
+          ls -1 "${HOME}/.local/share/godot/export_templates"
+
+      - name: Instalar gdtoolkit (gdlint)
+        run: |
+          python3 -m pip install --disable-pip-version-check --break-system-packages \
+            "gdtoolkit==4.*" || python3 -m pip install --disable-pip-version-check \
+            "gdtoolkit==4.*"
+          gdlint --version
+
+      - name: make verify
+        run: make verify
+
+      - name: Publicar build web como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          retention-days: 7
+          if-no-files-found: error
