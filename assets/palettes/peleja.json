@@ -1,0 +1,15 @@
+{
+  "id": "peleja",
+  "source": "scenes/title_screen.gd",
+  "generated_by": "tools/comfy/extract_palette.py",
+  "max_colors": 32,
+  "colors": [
+    {"name": "sky", "rgb": [18, 18, 42], "hex": "#12122a"},
+    {"name": "hills-back", "rgb": [11, 11, 28], "hex": "#0b0b1c"},
+    {"name": "hills-front", "rgb": [22, 22, 52], "hex": "#161634"},
+    {"name": "ground", "rgb": [34, 26, 46], "hex": "#221a2e"},
+    {"name": "star", "rgb": [120, 130, 190], "hex": "#7882be"},
+    {"name": "title", "rgb": [255, 211, 92], "hex": "#ffd35c"},
+    {"name": "prompt", "rgb": [255, 255, 255], "hex": "#ffffff"}
+  ]
+}

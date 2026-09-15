@@ -1,0 +1,54 @@
+{
+  "3": {
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" },
+    "inputs": {
+      "seed": 426240,
+      "steps": 28,
+      "cfg": 7.0,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1.0,
+      "model": ["4", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Checkpoint" },
+    "inputs": { "ckpt_name": "v1-5-pruned-emaonly.safetensors" }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "_meta": { "title": "Empty Latent" },
+    "inputs": { "width": 512, "height": 288, "batch_size": 1 }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Positive Prompt" },
+    "inputs": {
+      "text": "A detailed 16-bit retro pixel art illustration in 16:9 widescreen aspect ratio.",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative Prompt" },
+    "inputs": {
+      "text": "antialiasing, smooth vector shapes, 3D render, photorealism, mixed pixel resolutions, blurry pixels, watermark, signature, text artifacts, jpeg compression noise",
+      "clip": ["4", 1]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" },
+    "inputs": { "samples": ["3", 0], "vae": ["4", 2] }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" },
+    "inputs": { "filename_prefix": "peleja", "images": ["8", 0] }
+  }
+}

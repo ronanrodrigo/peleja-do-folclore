@@ -60,3 +60,22 @@ func test_every_texture_uses_nearest_filter() -> void:
 				CanvasItem.TEXTURE_FILTER_NEAREST,
 				"%s usa filtro nearest" % node.name
 			)
+
+
+func test_backdrop_asks_for_the_generated_art_by_slug() -> void:
+	assert_eq(_screen.BACKDROP_SLUG, "forest-arena", "fundo pede a arte gerada pelo slug")
+	assert_true(
+		_screen.backdrop_source() in [_screen.BACKDROP_SOURCE_GENERATED, _screen.BACKDROP_SOURCE_CODE],
+		"fundo declara de onde veio (arte gerada ou codigo)"
+	)
+
+
+func test_missing_generated_art_still_builds_a_backdrop_from_code() -> void:
+	var gateway := InMemoryAssetGateway.new()
+	assert_eq(
+		gateway.load_panel(_screen.BACKDROP_SLUG, PackedByteArray()).size(),
+		0,
+		"sem arte gerada no gateway, o fundo em codigo assume"
+	)
+	assert_not_null(_screen.get_node_or_null("Backdrop"), "a tela monta o fundo mesmo sem arte gerada")
+

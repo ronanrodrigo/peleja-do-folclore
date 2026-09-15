@@ -52,6 +52,7 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   fallback.
 - A tela de titulo desenha o proprio placeholder; ela passa a delegar ao
   `render-gateway` de producao quando o `sprite-render-adapter` existir.
+
 ## Ticket 2 — Nucleo de combate no dominio
 
 **Estado:** fechado.
@@ -106,3 +107,69 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   `MatchRules.resolve_round`, `Rng` injetado).
 - `archetype.gd`, `arcade_order.gd` e `spritesheet.gd` sao dado estavel
   introduzido aqui; os tickets 4 e 6 acrescentam campos, sem mudar contratos.
+
+## Ticket 9 — Arte de cenarios, paineis e retratos por ComfyUI
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `tools/comfy/` (ferramentaria, fora das camadas do jogo):
+  `workflows/pixelart_bg.json` (SD 1.5 em formato **API**: 512x288, 28 passos,
+  cfg 7.0, `dpmpp_2m`/`karras`), `scripts/run_workflow.py` (cliente HTTP do
+  ComfyUI feito so com a stdlib: injeta prompt/negativo/seed/tamanho por papel,
+  enfileira, espera e baixa), `postprocess.py` (426x240 com **nearest** +
+  quantizacao em **ate 32 cores** alinhada a paleta do jogo),
+  `generate.py` (as tres artes, metadados e `CREDITS.md`),
+  `extract_palette.py`, `test_postprocess.py` e `README.md`.
+- `assets/palettes/peleja.json`: paleta extraida das constantes `COLOR_*` da
+  tela de titulo (7 cores) -- o pos-processamento nao inventa cor.
+- `assets/generated/`: `backgrounds/forest-arena.png`,
+  `panels/reviravolta-panel.png` e `portraits/saci-portrait.png`, cada uma com o
+  `.json` de metadados ao lado (prompt, prompt negativo, seed, workflow,
+  `prompt_id`, modelo, licenca, URL de origem e sha256 do PNG), mais
+  `CREDITS.md` com modelo, licenca e URL de origem.
+- `src/infrastructure/godot-asset-gateway.gd`: adapter de producao do
+  `asset-gateway`. Carrega arte por slug, le os metadados e, quando o arquivo nao
+  existe, devolve o fallback do chamador -- ou o **fallback em codigo** (426x240
+  deterministico por slug) se o chamador nao passar nenhum.
+- `scenes/title_screen.gd`: o fundo vem da arte gerada pelo slug `forest-arena`
+  via asset-gateway; sem arte, o desenho em codigo assume (`backdrop_source()`).
+- `test/infrastructure/asset_gateway_fallback_test.gd` (slug, metadados,
+  fallback, CREDITS) e ajustes em `test/smoke/` para o modo `live` com o adapter
+  de producao no lugar.
+- `tools/capture_generated_art.gd` (+ `.tscn`) para o print de evidencia e o
+  alvo `make test-art` no Makefile.
+
+**Evidencia de fechamento**
+
+- `curl -s http://127.0.0.1:8188/system_stats` responde JSON (ComfyUI 0.36.0) e
+  `comfy model list` mostra `v1-5-pruned-emaonly.safetensors` (4165181 KB).
+- Modo `live` passou a usar producao no asset: `origin("asset") == "live"`
+  (antes caia para `sample`), coberto por
+  `test_live_mode_uses_the_production_adapter_where_it_exists`.
+- `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT
+  headless `22/22` testes, `136` asserts, com `-gexit`; export gerou
+  `index.html`, `index.js`, `index.pck` e `index.wasm` (single-threaded,
+  `39514754` bytes).
+- `make test-art` sai com codigo 0: `21` verificacoes do pos-processamento
+  (426x240, <= 32 cores, nearest sem suavizacao num xadrez 2x2 e determinismo
+  por sha256) mais as tres artes publicadas validadas, com o sha256 do `.json`
+  conferido contra o PNG.
+- Prints em `docs/evidence/ticket-09-*.png`: a tela de titulo usando a arte
+  gerada e as tres artes desenhadas pelo motor via asset-gateway (o capturador
+  registra `fonte=generated pixels=408960`).
+- Arte final: `forest-arena` (seed 42, `prompt_id` `b5df59e5-8e82-4325-9a81-4ec4abb80617`),
+  `reviravolta-panel` (seed 7, `921fc2ad-afc6-4c31-a20f-bc09acc612ac`) e
+  `saci-portrait` (seed 42, `978332d3-7187-4d0c-9cc8-dcf2c9507c56`).
+
+**Dividas assumidas nesta fatia**
+
+- Painel de Reviravolta e retrato ainda nao sao exibidos por um caso de uso:
+  entram na tela de Reviravolta e no retrato do arcade (tickets 7 e 10).
+- Lutadores e oponentes nao passam por aqui: sao spritesheets codificados como
+  dados (ADR 0005).
+- A seed de cada arte foi fixada por sweep visual e esta registrada no `.json`;
+  reproduzir o mesmo PNG depende do mesmo checkpoint e do mesmo backend (MPS).
+- Ate o ticket 7, o unico lugar do jogo que consome arte gerada e a tela de
+  titulo; o resto segue no fallback em codigo.

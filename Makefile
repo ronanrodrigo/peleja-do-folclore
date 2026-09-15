@@ -19,6 +19,12 @@ test: import
 lint:
 	gdlint src scenes autoloads test tools
 
+# Validacao da arte gerada por IA: pos-processamento (426x240, <= 32 cores) e
+# arte publicada + metadados. Complementa o verify; nao depende do ComfyUI no ar.
+test-art:
+	python3 tools/comfy/test_postprocess.py
+	python3 tools/comfy/generate.py --verify
+
 # Export web single-threaded (preset "Web" usa a variante nothreads).
 export: import
 	mkdir -p $(BUILD_DIR)

@@ -5,3 +5,5 @@ build/
 export_presets.cfg.bak
 .vercel
 .env*
+__pycache__/
+*.pyc
