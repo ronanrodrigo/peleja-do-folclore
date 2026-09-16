@@ -16,7 +16,10 @@ extends RefCounted
 ##       "idle": [{"width": 24, "height": 34, "pixels": [0, 1, 1, 0, ...]}, ...],
 ##     }
 ##   }
-## `pixels` aceita lista plana de indices ou lista de linhas, na ordem de leitura.
+## `pixels` aceita tres codificacoes equivalentes, na ordem de leitura:
+## lista plana de indices, lista de linhas (cada linha uma lista de indices) e
+## lista de linhas em texto compacto (um caractere por pixel: `PIXEL_CHARS`,
+## com `.` para pixel transparente). As tres chegam na mesma matriz de pixels.
 
 const FORMAT_VERSION := 1
 const MAX_PALETTE_SIZE := 256
@@ -24,6 +27,11 @@ const MAX_FRAME_WIDTH := 426
 const MAX_FRAME_HEIGHT := 240
 ## Indice de paleta reservado para pixel transparente, por convencao do formato.
 const TRANSPARENT_INDEX := 0
+## Alfabeto da codificacao compacta de linha: um caractere por pixel, na base 36.
+## O indice `i` da paleta escreve-se com o caractere `PIXEL_CHARS[i]`.
+const PIXEL_CHARS := "0123456789abcdefghijklmnopqrstuvwxyz"
+## Caractere que representa o pixel transparente na codificacao compacta.
+const TRANSPARENT_CHAR := "."
 ## Animacoes que todo lutador precisa ter para entrar numa Peleja.
 const REQUIRED_ANIMATIONS := [
 	"idle",
@@ -44,6 +52,9 @@ var palette: PackedColorArray
 ## Nome da animacao -> Array de frames, cada frame um Dictionary com
 ## "width", "height" e "pixels" (PackedByteArray de indices da paleta).
 var animations: Dictionary
+## Problemas encontrados na decodificacao (caractere invalido na codificacao
+## compacta, por exemplo). Entram em `errors()` junto das regras de conteudo.
+var decode_problems: PackedStringArray = PackedStringArray()
 
 
 func _init(
@@ -64,10 +75,12 @@ static func decode(data: Dictionary) -> Spritesheet:
 	if data.is_empty():
 		sheet.version = 0
 		return sheet
+	var problems: Array = []
 	sheet.slug = str(data.get("slug", ""))
 	sheet.version = int(data.get("version", 0))
 	sheet.palette = _decode_palette(data.get("palette", []))
-	sheet.animations = _decode_animations(data.get("animations", {}))
+	sheet.animations = _decode_animations(data.get("animations", {}), problems)
+	sheet.decode_problems = PackedStringArray(problems)
 	return sheet
 
 
@@ -83,7 +96,7 @@ static func _decode_palette(raw: Variant) -> PackedColorArray:
 	return colors
 
 
-static func _decode_animations(raw: Variant) -> Dictionary:
+static func _decode_animations(raw: Variant, problems: Array) -> Dictionary:
 	var result: Dictionary = {}
 	if not (raw is Dictionary):
 		return result
@@ -91,13 +104,16 @@ static func _decode_animations(raw: Variant) -> Dictionary:
 		var frames: Array = []
 		var raw_frames: Variant = raw[animation_name]
 		if raw_frames is Array:
+			var frame_index := 0
 			for raw_frame in raw_frames:
-				frames.append(_decode_frame(raw_frame))
+				var label := "%s[%d]" % [str(animation_name), frame_index]
+				frames.append(_decode_frame(raw_frame, label, problems))
+				frame_index += 1
 		result[str(animation_name)] = frames
 	return result
 
 
-static func _decode_frame(raw: Variant) -> Dictionary:
+static func _decode_frame(raw: Variant, label: String, problems: Array) -> Dictionary:
 	if not (raw is Dictionary):
 		return {"width": 0, "height": 0, "pixels": PackedByteArray()}
 	var pixels := PackedByteArray()
@@ -105,17 +121,43 @@ static func _decode_frame(raw: Variant) -> Dictionary:
 	if raw_pixels is PackedByteArray:
 		pixels = raw_pixels
 	elif raw_pixels is Array:
+		var row_index := 0
 		for entry in raw_pixels:
 			if entry is Array:
 				for value in entry:
 					pixels.append(int(value) & 0xFF)
+			elif entry is String:
+				pixels.append_array(_decode_row(entry, label, row_index, problems))
 			else:
 				pixels.append(int(entry) & 0xFF)
+			row_index += 1
 	return {
 		"width": int(raw.get("width", 0)),
 		"height": int(raw.get("height", 0)),
 		"pixels": pixels,
 	}
+
+
+## Linha em texto compacto: um caractere por pixel, na base `PIXEL_CHARS`, com
+## `.` para o pixel transparente. Caractere fora do alfabeto nao passa em
+## silencio: vira problema de decodificacao, que `errors()` reporta.
+static func _decode_row(
+	row: String, label: String, row_index: int, problems: Array
+) -> PackedByteArray:
+	var decoded := PackedByteArray()
+	for column in row.length():
+		var character := row[column]
+		if character == TRANSPARENT_CHAR:
+			decoded.append(TRANSPARENT_INDEX)
+			continue
+		var index := PIXEL_CHARS.find(character)
+		if index < 0:
+			problems.append(
+				"frame %s tem caractere invalido '%s' na linha %d" % [label, character, row_index]
+			)
+			index = TRANSPARENT_INDEX
+		decoded.append(index)
+	return decoded
 
 
 func animation_names() -> PackedStringArray:
@@ -163,6 +205,37 @@ func color_of(pixel_index: int) -> Color:
 	return palette[pixel_index]
 
 
+## Matriz de uma linha do frame (o renderer desenha linha a linha). Linha fora do
+## frame volta vazia, como o resto da leitura.
+func row_pixels(animation_name: String, frame_index: int, y: int) -> PackedByteArray:
+	var size := frame_size(animation_name, frame_index)
+	if y < 0 or y >= size.y:
+		return PackedByteArray()
+	var pixels := frame_pixels(animation_name, frame_index)
+	return pixels.slice(y * size.x, y * size.x + size.x)
+
+
+## Indice de paleta de um pixel do frame, em coordenadas do frame. Fora do frame
+## devolve o indice transparente -- o renderer nao precisa de caso especial.
+func pixel_at(animation_name: String, frame_index: int, x: int, y: int) -> int:
+	var size := frame_size(animation_name, frame_index)
+	if x < 0 or y < 0 or x >= size.x or y >= size.y:
+		return TRANSPARENT_INDEX
+	var pixels := frame_pixels(animation_name, frame_index)
+	if y * size.x + x >= pixels.size():
+		return TRANSPARENT_INDEX
+	return pixels[y * size.x + x]
+
+
+## Cor de um pixel do frame. Transparente quando o pixel nao existe ou e o
+## indice reservado de transparencia.
+func pixel_color(animation_name: String, frame_index: int, x: int, y: int) -> Color:
+	var index := pixel_at(animation_name, frame_index, x, y)
+	if index == TRANSPARENT_INDEX:
+		return Color(0, 0, 0, 0)
+	return color_of(index)
+
+
 ## Lista de problemas do formato; vazia quando a spritesheet esta valida.
 func errors() -> PackedStringArray:
 	var problems := PackedStringArray()
@@ -171,6 +244,7 @@ func errors() -> PackedStringArray:
 	if version != FORMAT_VERSION:
 		problems.append("versao %d nao suportada (esperado %d)" % [version, FORMAT_VERSION])
 	problems.append_array(_palette_errors())
+	problems.append_array(decode_problems)
 	for animation_name in REQUIRED_ANIMATIONS:
 		if not animations.has(animation_name):
 			problems.append("animacao obrigatoria ausente: %s" % animation_name)
