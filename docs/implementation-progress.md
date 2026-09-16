@@ -609,3 +609,90 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   loop).
 - Os WAV sao commitados como artefato (o gerador documenta como foram feitos);
   nenhuma dependencia externa de audio foi adicionada.
+
+## Ticket 7 — Vantagem Oculta e Reviravolta sobrenatural
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `src/domain/reviravolta_rule.gd`: a regra da Reviravolta como dado puro -- dispara
+  se e somente se o Oponente vence a Peleja, nunca com o Guardiao vencedor (nem em
+  empate ou Peleja em andamento); fases `voice`/`wind`/`root`/`dissolve`/`done` em
+  ticks (60 por linha, 90 de efeito), cena pulavel e a garantia de que a derrota
+  nunca encerra a campanha. A copy pt-BR nao mora no dominio.
+- `src/application/services/reviravolta-service.gd`: caso de uso da cena. Painel de
+  tela cheia pelo slug `reviravolta-panel` no asset-gateway com fallback (sem arte
+  o jogo nao quebra: painel neutro 426x240 em dado puro), trilha `reviravolta` e um
+  cue do contrato por fase (vento, raiz, dissolucao), efeitos deterministas no
+  render-gateway, opcao de pular e o progresso do arcade gravado no
+  persistence-gateway (`{"fight", "campaign_over": false, "reviravolta": true}`).
+- `src/interface-adapters/panel-adapter.gd`: copy pt-BR da Forca Sobrenatural
+  (`REVIRAVOLTA`, `FORÇA SOBRENATURAL`, quatro falas e `ESPAÇO PULA A CENA`) com
+  posicionamento na resolucao base 426x240 e faixa escura para o texto.
+- `scenes/reviravolta_panel.tscn` + `.gd`: cena fina 426x240 (filtro nearest) que
+  delega ao servico, desenha painel + efeitos + copy e drena o comando de pular do
+  input-gateway injetado (nenhum teclado sintetico).
+- `src/interface-adapters/hud-adapter.gd`: `fight_model` monta o HUD de uma Peleja a
+  partir do retrato do `match-service` -- vida so como PROPORCAO de barra (`"bar"`),
+  nomes, pips de round, relogio e status dos Especiais em pt-BR -- e
+  `discloses_hidden_advantage()` passou a ser recursivo (invariante da Vantagem
+  Oculta em qualquer nivel do modelo).
+- `src/application/services/arcade-service.gd`: `requires_reviravolta()` (a partir da
+  regra do dominio) sem mudar a progressao: `advance()` segue valendo e a campanha
+  nunca acaba por derrota.
+- `src/interface-adapters/bitmap-font.gd`: glifo `:` (relogio do HUD) e altura da
+  imagem acompanhando o glifo mais alto do texto -- `make_image` estourava ao
+  desenhar `Ç`/`Õ`, o que quebrava a copy acentuada.
+- `tools/capture_reviravolta.gd` + `.tscn` e o alvo `make capture-reviravolta`:
+  perde a primeira Peleja do arcade pela API publica do dominio, imprime os numeros
+  da Vantagem Oculta e grava um print por fase, mais o pulo e o fim sem interacao.
+- `docs/balance.md`: os dois numeros da calibragem (vida x1.6 e dano x1.4), a tabela
+  de margens contra os 7 Oponentes medida na captura e como recalibrar.
+- Testes novos (42): `test/domain/test_reviravolta_rule.gd` (10),
+  `test/application/test_reviravolta_service.gd` (10),
+  `test/application/test_reviravolta_campaign.gd` (4),
+  `test/interface_adapters/test_panel_adapter.gd` (8),
+  `test/smoke/test_reviravolta_panel_screen.gd` (6) e 4 casos novos em
+  `test/interface_adapters/test_hud_adapter.gd`, mais `reviravolta_rule.gd` na lista
+  de arquivos esperados do `test/domain/test_domain_purity.gd`.
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT headless
+  `430/430` testes e `234157` asserts com `-gexit` (eram 388 testes e 233726 asserts
+  em `474244c`: esta fatia acrescenta 42 testes); export web gerou `index.html`,
+  `index.js`, `index.pck` (`859164` bytes) e `index.wasm` (`39514754` bytes, a
+  variante single-threaded de sempre).
+- `make capture-reviravolta` sai com codigo 0 e grava 6 prints 426x240 em
+  `docs/evidence/ticket-07-reviravolta-{voice,wind,root,dissolve,skipped,end}.png`.
+  Saida real da ferramenta: `cena: ativa=true painel=gateway pixels=408960
+  arte_gerada=true` (a arte de tela cheia vem do asset-gateway pelo slug), as fases
+  `voice` -> `wind` -> `root` -> `dissolve` -> `done` em `330` ticks,
+  `dissolvido=true` sem nenhuma interacao, `pular: aceito=true ... pulada=true`,
+  `progresso do arcade: { "fight": 1, "campaign_over": false, "reviravolta": true }`
+  e `arcade segue: avancou=true peleja=2/7 completa=false`.
+- Reviravolta sempre dispara com o Oponente vencedor e nunca com o Guardiao vencedor:
+  provado no dominio (todos os quatro `MatchRules.Winner`), no caso de uso e na cena
+  (`panel_started()` falso com o Guardiao vencendo, sem tocar a trilha dela).
+- Perder a Peleja nao e game over de campanha: `requires_reviravolta()` verdadeiro na
+  Peleja perdida, `advance()` montando a Peleja 2, e o arcade correndo as 7 Pelejas
+  mesmo com a primeira perdida.
+- HUD nao expoe a Vantagem Oculta: o teste monta uma Peleja de verdade, confirma que
+  o Guardiao tem mais vida (`1600 > 620`) e mais dano (`1.750 > 0.720`) e prova que
+  nenhuma chave proibida aparece em nivel nenhum do modelo.
+- Numeros da calibragem medidos na captura (`vantagem oculta: Guardiao vida=1600
+  dano=1.750`): Oponentes de `620/0.720` (Capataz) a `890/0.900` (Falso Pastor), com
+  margem de vida de `+980` a `+710` e de dano de `+1.030` a `+0.850`; no fim do
+  arcade o Guardiao ainda tem `1.80x` a vida e `1.94x` o dano do Oponente.
+
+**Dividas assumidas nesta fatia**
+
+- A navegacao titulo -> arcade -> Reviravolta -> proxima Peleja ainda nao esta ligada
+  nas cenas: a cena da Reviravolta existe, roda com o vencedor real e prova a
+  continuacao da campanha, mas quem encadeia as telas e o polimento (ticket 10).
+- O Oponente dissolvido na cena e uma silhueta desenhada em codigo (retangulos) sobre
+  a arte de painel; nao ha spritesheet codificado dele, e o painel da Reviravolta e
+  arte gerada (ticket 9) com fallback em codigo, sem variacao por Arquetipo.
+- O comando de pular da cena usa a moldura ja existente do HUD (`MOVE_*`, `CONFIRM`,
+  `CANCEL`, `JUMP` no input-gateway); o remap de controles fica no ticket 10.
