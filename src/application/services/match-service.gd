@@ -65,6 +65,14 @@ var rules: MatchRules
 var ai: OpponentAi
 var special_move: Move
 var opponent_special_move: Move
+## Oponente do arcade: perfil do Arquetipo (aparencia, golpe proprio, IA) e o
+## golpe-assinatura que ele usa alem dos tres golpes comuns e do Especial.
+var opponent_profile: OpponentProfile
+var opponent_signature: Move
+## Golpe que rouba a Barra de Especial do Guardiao (Banqueiro e Falso Pastor).
+var meter_steal: MeterStealMove
+## Unidades de Barra de Especial efetivamente roubadas nesta Peleja.
+var meter_stolen: int = 0
 ## Efeito proprio do Golpe Especial do Guardiao (o Redemoinho do Saci puxa).
 var special_effect: SpecialMove
 ## Relatorio do ultimo tick de efeito do Especial (puxao, drenagem, status).
@@ -110,6 +118,14 @@ func configure(
 	special_effect = SpecialMoveTable.for_guardian(guardian_name)
 	opponent_special_move = Move.special(opponent.stats.display_name)
 	ai = OpponentAi.new(difficulty)
+	opponent_profile = OpponentProfile.for_archetype(archetype)
+	opponent_signature = null
+	meter_steal = null
+	meter_stolen = 0
+	if opponent_profile != null:
+		ai.apply_overrides(opponent_profile.ai_overrides)
+		opponent_signature = opponent_profile.signature_move()
+		meter_steal = opponent_profile.meter_steal
 	rules = MatchRules.new()
 	clock = RoundClock.new(ROUND_SECONDS)
 	_colors = _load_palette()
@@ -283,6 +299,8 @@ func _apply_opponent_ai() -> void:
 			opponent.start_move(Move.heavy())
 		OpponentAi.Action.GRAB:
 			opponent.start_move(Move.grab())
+		OpponentAi.Action.SIGNATURE:
+			opponent.start_move(opponent_signature)
 		OpponentAi.Action.SPECIAL:
 			opponent.start_special(opponent_special_move)
 		_:
@@ -290,10 +308,27 @@ func _apply_opponent_ai() -> void:
 
 
 func _resolve_combat() -> void:
+	# O golpe do Oponente e lido ANTES da resolucao: quem apanha perde o golpe em
+	# andamento, e o roubo de barra precisa saber qual golpe conectou.
+	var opponent_move := opponent.current_move
 	var guardian_damage := guardian.resolve_hit(opponent)
 	var opponent_damage := opponent.resolve_hit(guardian)
 	if guardian_damage > 0 or opponent_damage > 0:
 		_sfx("hit")
+	if opponent_damage > 0:
+		_apply_meter_steal(opponent_move)
+
+
+## O golpe-assinatura de quem cobra (Banqueiro e Falso Pastor) tira Barra de
+## Especial do Guardiao no contato -- "Juros Compostos" e "Dizimo". Como o Golpe
+## Especial exige a barra cheia, o roubo adia o Especial dele: o efeito de jogo do
+## Arquetipo, sem regra nova no `Fighter`.
+func _apply_meter_steal(move: Move) -> void:
+	if meter_steal == null or move == null:
+		return
+	if not meter_steal.is_named(move.display_name):
+		return
+	meter_stolen += meter_steal.steal_from(guardian, opponent)
 
 
 func _face_each_other() -> void:
@@ -443,6 +478,13 @@ func snapshot() -> Dictionary:
 		"special_report": special_report,
 		"guardian_status": _status_report(guardian),
 		"opponent_status": _status_report(opponent),
+		"opponent_slug": opponent_profile.slug if opponent_profile != null else "",
+		"opponent_signature": (
+			opponent_profile.signature_name if opponent_profile != null else ""
+		),
+		"opponent_steals_meter": meter_steal != null,
+		"meter_stolen": meter_stolen,
+		"ai_signature_chance": ai.signature_chance if ai != null else 0.0,
 	}
 
 

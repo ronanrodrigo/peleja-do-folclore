@@ -46,3 +46,14 @@ func consume() -> bool:
 
 func reset() -> void:
 	current = 0
+
+
+## Tira unidades da barra e devolve quanto saiu de verdade (nunca mais do que ela
+## tinha). E o roubo de Barra de Especial de um golpe de Oponente
+## (`MeterStealMove`): quem cobra passa a barra para o proprio bolso.
+func drain(amount: int) -> int:
+	if amount <= 0 or is_empty():
+		return 0
+	var drained := mini(amount, current)
+	current -= drained
+	return drained
