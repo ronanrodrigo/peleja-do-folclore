@@ -35,6 +35,9 @@ var move_frame: int = 0
 var hit_registered: bool = false
 var hurt_frames: int = 0
 var damage_variance: int = DEFAULT_DAMAGE_VARIANCE
+## Status ativos dos Golpes Especiais (`FighterStatus`): sono, comandos
+## invertidos. Objeto proprio para o lutador nao crescer em superficie publica.
+var statuses: FighterStatus
 
 
 func _init(
@@ -47,6 +50,7 @@ func _init(
 	rng = p_rng if p_rng != null else Rng.new()
 	health = Health.new(stats.max_health)
 	meter = SpecialMeter.new()
+	statuses = FighterStatus.new()
 	facing = 1 if p_facing >= 0 else -1
 	position = Vector2i(clampi(p_x, STAGE_MIN_X, STAGE_MAX_X), 0)
 
@@ -108,9 +112,11 @@ func is_knocked_out() -> bool:
 	return health.is_empty() or state == FighterState.State.KNOCKED_DOWN
 
 
-## Verdadeiro quando o lutador aceita um comando novo agora.
+## Verdadeiro quando o lutador aceita um comando novo agora. Adormecido por um
+## Golpe Especial (Canto do Rio, Nana Nenem) ele nao aceita comando nenhum: o
+## sono vive em `statuses` (`FighterStatus`).
 func can_act() -> bool:
-	return FighterState.accepts_command(state) and current_move == null
+	return FighterState.accepts_command(state) and current_move == null and not statuses.is_asleep()
 
 
 func can_start_move() -> bool:
@@ -132,6 +138,10 @@ func walk(direction: int) -> bool:
 		state = FighterState.State.IDLE
 		return true
 	var step := 1 if direction > 0 else -1
+	# Pes Invertidos: com o lado trocado, pedir um lado anda para o outro. Vale
+	# igual para o comando do jogador e para a decisao de avancar/recuar da IA.
+	if statuses.inverts_controls():
+		step = StatusEffect.invert_direction(step)
 	state = FighterState.State.WALK
 	position.x = clampi(position.x + step * stats.walk_speed, STAGE_MIN_X, STAGE_MAX_X)
 	return true
@@ -200,6 +210,7 @@ func start_special(move: Move) -> bool:
 ## Avanca um tick de simulacao. Devolve verdadeiro quando o golpe em andamento
 ## terminou neste tick.
 func advance_tick() -> bool:
+	_advance_statuses()
 	if current_move != null:
 		move_frame += 1
 		if current_move.is_finished_at(move_frame):
@@ -261,6 +272,7 @@ func receive_hit(move: Move, attacker: Fighter, p_damage_variance: int = 0) -> i
 func reset_for_round(spawn_x: int = -1) -> void:
 	health.reset()
 	meter.reset()
+	statuses.clear()
 	current_move = null
 	move_frame = 0
 	hit_registered = false
@@ -268,6 +280,12 @@ func reset_for_round(spawn_x: int = -1) -> void:
 	state = FighterState.State.IDLE
 	if spawn_x >= 0:
 		position.x = clampi(spawn_x, STAGE_MIN_X, STAGE_MAX_X)
+
+
+## Avanca os status um tick (o efeito dura em ticks de simulacao).
+func _advance_statuses() -> void:
+	if statuses != null:
+		statuses.advance()
 
 
 func _roll_variance() -> int:

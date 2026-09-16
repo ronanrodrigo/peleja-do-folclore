@@ -13,11 +13,15 @@ func test_the_table_gives_the_saci_the_redemoinho_with_pull() -> void:
 	assert_gt(effect.pull_reach, 0)
 
 
-func test_a_guardian_without_a_registered_effect_has_no_pull() -> void:
-	var effect := SpecialMoveTable.for_guardian(GuardianStats.CURUPIRA)
-	assert_false(effect.has_pull())
-	assert_eq(effect.display_name, "", "so o Saci tem efeito cadastrado nesta fatia")
-	assert_eq(SpecialMoveTable.display_name_for(GuardianStats.SACI), SpecialMove.REDEMOINHO)
+func test_a_guardian_outside_the_roster_has_no_registered_effect() -> void:
+	var effect := SpecialMoveTable.for_guardian("Guardião de Fora do Elenco")
+	assert_false(effect.has_effect())
+	assert_eq(effect.display_name, "", "nome fora do elenco nao tem Golpe Especial cadastrado")
+	assert_eq(
+		SpecialMoveTable.display_name_for(GuardianStats.CURUPIRA),
+		SpecialMove.PES_INVERTIDOS,
+		"e o Curupira ja tem o efeito proprio dele (ticket 5)"
+	)
 
 
 func test_the_special_only_fires_with_a_full_meter_and_consumes_it_whole() -> void:
