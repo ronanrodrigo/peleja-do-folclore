@@ -22,6 +22,7 @@ enum Action {
 	HEAVY,
 	GRAB,
 	SPECIAL,
+	SIGNATURE,
 }
 
 enum Difficulty {
@@ -45,6 +46,7 @@ const ACTION_NAMES := {
 	Action.HEAVY: "heavy",
 	Action.GRAB: "grab",
 	Action.SPECIAL: "special",
+	Action.SIGNATURE: "signature",
 }
 
 ## Perfis de dificuldade: numero explicito, nunca ajuste implicito.
@@ -89,6 +91,10 @@ const PROFILES := {
 }
 
 var difficulty: int
+## Chance de o Arquetipo usar o golpe-assinatura dentro do ataque. Vem do
+## `OpponentProfile` (`apply_overrides`); zero significa "sem assinatura", e
+## entao a IA decide exatamente como antes dos perfis existirem.
+var signature_chance: float = 0.0
 var _profile: Dictionary
 var _ticks_until_decision: int = 0
 var _last_action: int = Action.WAIT
@@ -101,7 +107,9 @@ func _init(p_difficulty: int = Difficulty.NORMAL) -> void:
 ## Troca o nivel de dificuldade. Nivel desconhecido cai para NORMAL.
 func set_difficulty(p_difficulty: int) -> void:
 	difficulty = p_difficulty if PROFILES.has(p_difficulty) else Difficulty.NORMAL
-	_profile = PROFILES[difficulty]
+	# Copia: os perfis de Arquetipo ajustam estes numeros sem tocar no dado global.
+	_profile = (PROFILES[difficulty] as Dictionary).duplicate()
+	signature_chance = 0.0
 	_ticks_until_decision = 0
 	_last_action = Action.WAIT
 
@@ -155,6 +163,8 @@ func _choose(opponent: Fighter, guardian: Fighter, rng: Rng) -> int:
 
 
 func _pick_attack(rng: Rng) -> int:
+	if signature_chance > 0.0 and rng.chance(signature_chance):
+		return Action.SIGNATURE
 	if rng.chance(value_of("grab_chance")):
 		return Action.GRAB
 	if rng.chance(value_of("heavy_chance")):
@@ -183,6 +193,21 @@ static func levels() -> Array:
 	return [Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD]
 
 
-## Verdadeiro quando a acao e um golpe (leve, pesado, agarrao ou especial).
+## Verdadeiro quando a acao e um golpe (leve, pesado, agarrao, assinatura ou
+## especial).
 static func is_attack(action: int) -> bool:
-	return action in [Action.LIGHT, Action.HEAVY, Action.GRAB, Action.SPECIAL]
+	return action in [Action.LIGHT, Action.HEAVY, Action.GRAB, Action.SPECIAL, Action.SIGNATURE]
+
+
+## Mescla o ajuste de IA de um Arquetipo (`OpponentProfile.ai_overrides`) sobre o
+## perfil do nivel -- sem tocar nos `PROFILES`, que sao dado compartilhado. A
+## chave `signature_chance` e a unica que sai do dicionario de perfil: ela liga o
+## golpe proprio do Oponente. Chaves desconhecidas sao simplesmente lidas por
+## `value_of`, que devolve zero para o que nao existe.
+func apply_overrides(overrides: Dictionary) -> void:
+	for key in overrides.keys():
+		var name := str(key)
+		if name == "signature_chance":
+			signature_chance = clampf(float(overrides[key]), 0.0, 1.0)
+		else:
+			_profile[name] = overrides[key]
