@@ -317,3 +317,102 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   `SpecialMoveTable` (o Saci e o unico com efeito cadastrado aqui).
 - `heavy` usa um quadro mais largo (32x34) que as demais animacoes de corpo: e o
   formato permitindo quadro por animacao, nao um caso especial no renderer.
+
+## Ticket 5 — Elenco folclorico completo
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `src/domain/status_effect.gd`: o status de Golpe Especial como dado puro —
+  `INVERT_CONTROLS` e `SLEEP`, duracao em ticks de simulacao (60 por segundo),
+  `advance_tick`/`refresh` e `invert_direction` (o espelho do lado). Nada de
+  temporizador, cena ou no de UI.
+- `src/domain/fighter_status.gd`: o conjunto de status num objeto proprio, para o
+  `Fighter` manter a mesma superficie publica de antes (`add`, `has`,
+  `remaining`, `is_asleep`, `inverts_controls`, `advance`, `names`).
+- `src/domain/special_move.gd` + `special_move_table.gd` (adicao no fim do
+  arquivo): **Pes Invertidos** (Curupira: 180 ticks = 3 s de comandos invertidos
+  e queda de 24 px por tick para o lado contrario ao que o alvo defende),
+  **Canto do Rio** (Iara: sono de 120 ticks e dreno de 3 de vida por tick,
+  devolvido a ela) e **Nana Nenem** (Cuca: sono de 120 ticks e mordida de jacare
+  de 4 de dano por tick), aplicados por `apply_active_tick` na janela ativa do
+  golpe. O Saci/Redemoinho e a funcao `for_guardian` seguem intactos; o novo
+  `_effect_for_roster` cobre o resto do elenco e um nome fora dele segue sem
+  efeito.
+- `src/domain/fighter.gd` (adicao por dentro, sem metodo publico novo): os status
+  avancam a cada tick, o sono tira o controle (`can_act`) e o lado trocado e
+  aplicado no `walk` — vale igual para o comando do jogador e para a decisao de
+  avancar/recuar da IA. `health.gd` ganha `heal()` para o dreno.
+- `src/domain/guardian_stats.gd` (adicao): `ROSTER`/`SLUGS` com os 4 Guardioes e
+  os identificadores em ingles (`saci`, `curupira`, `iara`, `cuca`).
+- `src/application/services/character-select-service.gd`: a selecao como
+  comando-e-estado puro — `rows()` (nome, slug e nome do Golpe Especial por
+  Guardiao), navegacao com volta no elenco, confirmar/cancelar e `result()`
+  devolvendo o Guardiao escolhido como **dado**. Nenhum estado global escondido:
+  duas instancias nao se enxergam (coberto por teste).
+- `src/application/services/match-service.gd` (adicao): aplica o efeito da lenda
+  por tick de janela ativa (`special_report`) e expoe `guardian_status` e
+  `opponent_status` no `snapshot()`.
+- `src/interface-adapters/hud-adapter.gd`: modelo de HUD da selecao — retrato
+  pelo slug da spritesheet codificada, nome e nome do Golpe Especial, coluna
+  selecionada destacada — com `discloses_hidden_advantage()` como invariante da
+  Vantagem Oculta. `src/interface-adapters/bitmap-font.gd`: a fonte bitmap 5x7
+  com glifos acentuados (Á, Ã, Ç, É, Ê, Í, Ó, Ô, Õ, Ú) para a copy pt-BR.
+- `scenes/character_select.tscn` + `.gd`: cena fina (monta o no, delega ao
+  servico e ao adapter, drena o input-gateway e emite `guardian_selected`);
+  `scenes/fight.gd` passa a aceitar `guardian_name`, com o Saci como padrao — e o
+  ponto em que o arcade entrega a escolha do jogador.
+- `assets/spritesheets/curupira.json`, `iara.json` e `cuca.json`: 10 animacoes e
+  23 frames cada, no mesmo esquema de quadros do Saci (corpo 24x34, agachado
+  26x20, pesado 32x34, especial 40x40, nocaute 34x20), como **dado versionado**
+  (paleta + matrizes de pixel). Nenhum PNG binario de lutador.
+- `tools/art/pixel_grid.py` (maquinaria comum: matriz, contorno por silhueta,
+  codificacao compacta e previa), `tools/art/build_cast_spritesheets.py` (os tres
+  novos Guardioes) e o gerador do Saci passando a usar a maquinaria — reproduz
+  `assets/spritesheets/saci.json` byte a byte.
+- `tools/capture_cast.gd` + `.tscn` e o alvo `make capture-cast`: a tela de
+  selecao de verdade (cursor em cada Guardiao) e uma Peleja de verdade por
+  Guardiao, com a arte desenhada pelo `sprite-render-adapter` de producao.
+- `docs/spritesheet-format.md`: secao do elenco completo, com golpe e efeito de
+  cada Guardiao.
+- Testes: `test/domain/test_status_effect.gd`, `test/domain/test_fighter_status.gd`,
+  `test/domain/test_special_moves.gd`, `test/application/test_special_effects_in_match.gd`,
+  `test/application/test_character_select_service.gd`,
+  `test/interface_adapters/test_hud_adapter.gd`,
+  `test/smoke/test_character_select_screen.gd` e
+  `test/infrastructure/test_cast_spritesheets.gd`, mais o ajuste do
+  `test/domain/test_special_move.gd` (o Curupira deixou de ser o "sem efeito").
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT
+  headless `297/297` testes e `86286` asserts com `-gexit` (eram 239 testes no
+  ticket 4: esta fatia acrescenta 58); export web gerou `index.html`, `index.js`,
+  `index.pck` e `index.wasm` (`39514754` bytes, a variante single-threaded).
+- `make capture-cast` sai com codigo 0 e grava 8 prints 426x240 em
+  `docs/evidence/ticket-05-*`: a tela de selecao com o cursor em cada um dos 4
+  Guardioes (`ticket-05-select-{saci,curupira,iara,cuca}.png`) e cada Guardiao em
+  luta na janela ativa do proprio Golpe Especial
+  (`ticket-05-fight-{saci,curupira,iara,cuca}.png`, escala 3x, com o relatorio
+  `golpe=... janela_ativa=true` no log).
+- Cada especial tem teste proprio: inversao de comandos (o comando do jogador
+  espelhado no `match-service` e a duracao de 3 s), drenagem de vida (o que sai
+  do Oponente volta para a Iara, sem vida negativa) e sono (o Oponente deixa de
+  aceitar comando e a IA nao anda enquanto durar), com o determinismo por semente
+  reafirmado para os efeitos.
+
+**Dividas assumidas nesta fatia**
+
+- O `arcade-service` (ticket 6) consome `CharacterSelectService.result()`
+  (`{"guardian", "slug", "special_name"}`) e passa o Guardiao para
+  `scenes/fight.gd` por `guardian_name`; nesta fatia nenhum servico de arcade e
+  importado ou instanciado.
+- O Oponente segue um retangulo colorido na arena: a arte dos 7 Arquetipos e o
+  roubo de barra sao do ticket 6, e a composicao dos sprites na cena de luta
+  (hoje o print compoe) entra no polimento do ticket 10.
+- A inversao de comandos do Oponente vale pela IA (nao ha jogador humano do outro
+  lado); o caminho do Guardiao invertido esta implementado e testado.
+- `match-service.gd` e `special_move_table.gd` foram alterados de forma aditiva e
+  localizada (efeito no fim da funcao, `_effect_for_roster` no fim do arquivo)
+  porque os tickets 6 e 8 rodam em paralelo sobre esses mesmos arquivos.

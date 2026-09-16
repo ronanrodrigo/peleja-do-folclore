@@ -4,7 +4,7 @@ TEST_DIR ?= res://test
 WEB_PRESET ?= Web
 BUILD_DIR ?= build/web
 
-.PHONY: run import test lint export verify clean test-art capture-saci
+.PHONY: run import test lint export verify clean test-art capture-saci capture-cast
 
 run:
 	$(GODOT) --path .
@@ -29,6 +29,11 @@ test-art:
 # sprite-render-adapter de producao, em docs/evidence/.
 capture-saci: import
 	$(GODOT) --path . tools/capture_saci.tscn -- res://docs/evidence
+
+# Prints de evidencia do ticket 5: a tela de selecao dos 4 Guardioes e cada um
+# em luta, com a arte codificada desenhada pelo renderer de producao.
+capture-cast: import
+	$(GODOT) --path . tools/capture_cast.tscn -- res://docs/evidence
 
 # Export web single-threaded (preset "Web" usa a variante nothreads).
 export: import
