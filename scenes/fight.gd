@@ -26,6 +26,10 @@ const COLOR_CLEAR := Color8(18, 18, 42)
 ## Verdadeiro por padrao: a cena roda sozinha. A ferramenta de evidencia desliga
 ## e dirige os ticks para um print determinista.
 var auto_run := true
+## Guardiao que entra na Peleja. Padrao do Saci; quem escolheu outro Guardiao na
+## tela de selecao (ou a ferramenta de evidencia) troca aqui, antes de a cena
+## subir. O arcade passa esta escolha quando o ticket 6 chegar.
+var guardian_name: String = GUARDIAN_NAME
 var match_service: MatchService
 
 var _accumulator: float = 0.0
@@ -102,7 +106,7 @@ func _setup_match() -> void:
 		container.audio_gateway()
 	)
 	match_service.configure(
-		GUARDIAN_NAME, OPPONENT_ARCHETYPE, GUARDIAN_SEED, OPPONENT_SEED, DIFFICULTY
+		guardian_name, OPPONENT_ARCHETYPE, GUARDIAN_SEED, OPPONENT_SEED, DIFFICULTY
 	)
 
 
