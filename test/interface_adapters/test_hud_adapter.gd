@@ -188,3 +188,110 @@ func test_the_clock_and_the_status_copy_have_glyphs_in_the_bitmap_font() -> void
 				BitmapFont.FONT_GLYPHS.has(text.substr(index, 1)),
 				"glifo proprio para todo caractere de '%s'" % text
 			)
+
+## --- HUD final de luta e do arcade (ticket 10) ---
+
+func _fight_state() -> Dictionary:
+	var service := _fight_service()
+	var state := service.snapshot()
+	state["guardian_health_ratio"] = 0.75
+	state["opponent_health_ratio"] = 0.25
+	state["guardian_meter_ratio"] = 1.0
+	state["opponent_meter_ratio"] = 0.5
+	state["guardian_rounds"] = 1
+	return state
+
+
+func _find_entry(entries: Array, color: Color, position: int) -> Rect2i:
+	var found: Array = []
+	for entry in entries:
+		if entry["color"] == color:
+			found.append(entry["rect"])
+	return found[position]
+
+
+func test_the_fight_hud_has_entries_for_both_bars_meters_and_round_pips() -> void:
+	var model := _adapter.fight_model(_fight_state(), GuardianStats.SACI, "O Capeto")
+	var entries: Array = _adapter.fight_hud_entries(model)
+	var expected := 6 + MatchRules.ROUNDS_TO_WIN * 2
+	assert_eq(entries.size(), expected, "um retangulo por elemento do HUD")
+	for entry in entries:
+		var rect: Rect2i = entry["rect"]
+		assert_true(rect.position.x >= 0 and rect.position.y >= 0, "dentro da tela")
+		assert_true(rect.end.x <= BASE_SIZE.x, "nao passa da borda direita")
+		assert_true(rect.end.y <= BASE_SIZE.y, "nao passa da borda de baixo")
+	var left_health := _find_entry(entries, HudAdapter.COLOR_HEALTH_FILL, 0)
+	assert_eq(left_health.size.x, roundi(HudAdapter.FIGHT_BAR_WIDTH * 0.75), "vida em proporcao")
+	var left_meter := _find_entry(entries, HudAdapter.COLOR_METER_FILL, 0)
+	assert_eq(left_meter.size.x, HudAdapter.FIGHT_BAR_WIDTH, "barra de Especial cheia")
+	var right_meter := _find_entry(entries, HudAdapter.COLOR_METER_FILL, 1)
+	assert_eq(right_meter.size.x, HudAdapter.FIGHT_BAR_WIDTH / 2, "metade da barra do Oponente")
+
+
+func test_the_fight_hud_labels_are_the_two_names_and_the_clock() -> void:
+	var model := _adapter.fight_model(_fight_state(), GuardianStats.SACI, "O Capeto")
+	var labels: Array = _adapter.fight_hud_labels(model)
+	assert_eq(labels.size(), 3, "nome a esquerda, nome a direita e relogio")
+	assert_eq(labels[0]["text"], GuardianStats.SACI)
+	assert_eq(labels[1]["text"], "O Capeto")
+	assert_eq(labels[2]["text"], "1:00")
+	var right: Vector2i = labels[1]["position"]
+	var right_width: int = BitmapFont.text_width("O Capeto") * int(labels[1]["scale"])
+	assert_true(right.x + right_width <= BASE_SIZE.x, "o nome do Oponente cabe na tela")
+
+
+func test_the_arcade_line_joins_the_fight_hud_when_requested() -> void:
+	var model := _adapter.fight_model(_fight_state(), GuardianStats.SACI, "O Capeto")
+	assert_eq(_adapter.fight_hud_labels(model).size(), 3, "sem arcade, so tres rotulos")
+	model["arcade_text"] = "PELEJA 3/7"
+	var labels: Array = _adapter.fight_hud_labels(model)
+	assert_eq(labels.size(), 4, "a linha do arcade entra por ultimo")
+	assert_eq(labels[3]["text"], "PELEJA 3/7")
+
+
+func test_the_arcade_hud_shows_the_position_the_opponent_and_the_difficulty() -> void:
+	var model := _adapter.arcade_model({
+		"fight": 3,
+		"fights": 7,
+		"opponent_name": "O Camisa-Verde",
+		"opponent_signature": "Gaita de Marcha",
+		"difficulty": "normal",
+		"complete": false,
+	})
+	assert_eq(model["fight_text"], "PELEJA 3/7")
+	assert_eq(model["opponent_text"], "O Camisa-Verde")
+	assert_eq(model["signature_text"], "GOLPE: Gaita de Marcha")
+	assert_eq(model["difficulty_text"], "MÉDIO", "dificuldade em pt-BR")
+	assert_almost_eq(float(model["progress"]), 3.0 / 7.0, 0.001)
+	assert_false(model["complete"])
+
+
+func test_the_arcade_hud_never_discloses_the_hidden_advantage() -> void:
+	var service := _fight_service()
+	var model := _adapter.arcade_model({
+		"fight": 1,
+		"fights": 7,
+		"guardian_health_ratio": service.guardian.health.ratio(),
+	})
+	assert_false(_adapter.discloses_hidden_advantage(model))
+
+
+func test_the_arcade_copy_has_glyphs_in_the_bitmap_font() -> void:
+	var model := _adapter.arcade_model({
+		"fight": 1,
+		"fights": 7,
+		"opponent_name": "O Doutor Pureza",
+		"opponent_signature": "Teoria Drenante",
+		"difficulty": "hard",
+	})
+	for text in [
+		str(model["fight_text"]),
+		str(model["difficulty_text"]),
+		str(model["signature_text"]),
+	]:
+		text = text.to_upper()
+		for index in text.length():
+			assert_true(
+				BitmapFont.FONT_GLYPHS.has(text.substr(index, 1)),
+				"glifo proprio para todo caractere de '%s'" % text
+			)

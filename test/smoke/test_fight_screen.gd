@@ -78,3 +78,96 @@ func test_the_scene_holds_no_combat_rules() -> void:
 			property_name in ["health", "damage", "rounds", "last_round_result"],
 			"a cena nao guarda estado de combate (%s)" % property_name
 		)
+
+
+## --- Polimento: HUD final, sprites na cena e arcade (ticket 10) ---
+
+func _production_container() -> bool:
+	if _container == null or not _container.has_method("wire"):
+		return false
+	OS.set_environment("PELEJA_ADAPTERS", "live")
+	_container.wire()
+	return true
+
+
+func _release_container() -> void:
+	OS.set_environment("PELEJA_ADAPTERS", "sample")
+	if _container != null and _container.has_method("wire"):
+		_container.wire()
+
+
+func test_the_hud_final_shows_names_bars_meter_rounds_and_clock() -> void:
+	var model: Dictionary = _screen.hud_model()
+	assert_eq(model["left"]["name"], GuardianStats.SACI, "nome do Guardiao na tela")
+	assert_eq(str(model["right"]["name"]).is_empty(), false, "nome do Oponente na tela")
+	assert_almost_eq(float(model["left"]["bar"]), 1.0, 0.01, "vida cheia no inicio")
+	assert_true(model.has("left") and model["left"].has("meter"), "barra de Especial no HUD")
+	assert_eq(int(model["rounds_to_win"]), MatchRules.ROUNDS_TO_WIN, "pips de round")
+	assert_eq(model["clock_text"], "1:00", "relogio do round")
+	assert_false(
+		HudAdapter.new().discloses_hidden_advantage(model),
+		"o HUD final nao revela a Vantagem Oculta"
+	)
+
+
+func test_the_hud_is_drawn_as_labels_over_the_surface() -> void:
+	_screen.draw_frame()
+	var count := 0
+	for child in _screen.get_children():
+		if child is TextureRect and str(child.name).begins_with("HudLabel"):
+			count += 1
+	assert_true(count >= 3, "nome dos dois lutadores e o relogio na tela")
+
+
+func test_the_arcade_hud_appears_when_the_fight_comes_from_the_arcade() -> void:
+	var arcade := ArcadeService.new(
+		SampleInputGateway.new(),
+		SampleRenderGateway.new(),
+		InMemoryAssetGateway.new(),
+		SilentAudioGateway.new()
+	)
+	assert_true(arcade.execute([], GuardianStats.CURUPIRA, 31, 41))
+	_screen.attach_arcade(arcade)
+	_screen.draw_frame()
+	assert_eq(_screen.arcade_hud_model()["fight_text"], "PELEJA 1/7")
+	assert_eq(_screen.hud_model()["arcade_text"], "PELEJA 1/7", "a linha do arcade no HUD")
+	assert_eq(_screen.guardian_name, GuardianStats.CURUPIRA, "o Guardiao veio do arcade")
+
+
+func test_the_animation_comes_from_the_domain_state_and_move() -> void:
+	var guardian: Fighter = _screen.match_service.guardian
+	guardian.stand()
+	assert_eq(_screen.animation_for(guardian), "idle")
+	guardian.walk(1)
+	assert_eq(_screen.animation_for(guardian), "walk")
+	guardian.crouch()
+	assert_eq(_screen.animation_for(guardian), "crouch")
+	guardian.block()
+	assert_eq(_screen.animation_for(guardian), "block")
+	guardian.current_move = null
+	guardian.state = FighterState.State.IDLE
+	guardian.start_move(Move.special("Redemoinho"))
+	assert_eq(_screen.animation_for(guardian), "special")
+	guardian.current_move = null
+	guardian.state = FighterState.State.IDLE
+	guardian.start_move(Move.grab())
+	assert_eq(_screen.animation_for(guardian), "grab")
+	guardian.state = FighterState.State.HURT
+	assert_eq(_screen.animation_for(guardian), "hurt")
+	guardian.state = FighterState.State.KNOCKED_DOWN
+	assert_eq(_screen.animation_for(guardian), "ko")
+
+
+func test_the_production_renderer_composes_both_spritesheets_and_the_hud() -> void:
+	if not _production_container():
+		return
+	var screen: Variant = load(FIGHT_SCENE).instantiate()
+	screen.auto_run = false
+	add_child_autofree(screen)
+	await wait_process_frames(1)
+	screen.draw_frame()
+	var report: Dictionary = screen.sprite_report()
+	assert_true(bool(report["surface"]), "o renderer de producao montou a superficie")
+	assert_gt(int(report["sprites_drawn"]), 0, "os lutadores sao desenhados pelos spritesheets")
+	assert_gt(int(report["labels"]), 0, "o HUD final esta na tela")
+	_release_container()
