@@ -20,23 +20,38 @@ const DEFAULT_MUTED := false
 
 var _persistence: PersistenceGateway
 var _audio: AudioGateway
+var _input: InputGateway
+var _controls: ControlBindings
 var _volume: float = DEFAULT_MASTER_VOLUME
 var _muted: bool = DEFAULT_MUTED
 
 
-func _init(p_persistence: PersistenceGateway, p_audio: AudioGateway) -> void:
+func _init(
+	p_persistence: PersistenceGateway,
+	p_audio: AudioGateway,
+	p_input: InputGateway = null
+) -> void:
 	_persistence = p_persistence
 	_audio = p_audio
+	_input = p_input
+	_controls = ControlBindings.new(_persistence, _input)
 
 
-## Restaura as preferencias gravadas e aplica no audio. Sem nada gravado, valem
-## os padroes (o jogo nunca comeca mudo nem no volume zero).
+## Restaura as preferencias gravadas (volume, mudo e remap) e aplica no audio. Sem
+## nada gravado, valem os padroes (o jogo nunca comeca mudo nem no volume zero).
 func load_preferences() -> void:
 	_volume = clampf(
 		float(_persistence.load_value(KEY_MASTER_VOLUME, DEFAULT_MASTER_VOLUME)), 0.0, 1.0
 	)
 	_muted = bool(_persistence.load_value(KEY_MUTED, DEFAULT_MUTED))
 	_apply()
+	_controls.load_bindings()
+
+
+## Remap de controles do jogador (classe de apoio: acoes, teclas e o passo a passo
+## do remap). O caso de uso so empresta a superficie que a tela precisa.
+func controls() -> ControlBindings:
+	return _controls
 
 
 func volume() -> float:

@@ -116,3 +116,35 @@ func test_volume_percent_and_step_are_consistent() -> void:
 	service.set_volume_percent(70)
 	assert_eq(service.volume_percent(), 70, "percentual devolvido como pedido")
 	assert_eq(service.volume_step(), 7, "sete passos de dez")
+
+## --- Remap de controles (ticket 10) ---
+
+func test_the_remap_is_applied_to_the_input_gateway_and_persisted() -> void:
+	var persistence := InMemoryPersistenceGateway.new()
+	var input := SampleInputGateway.new()
+	var service := OptionsService.new(persistence, SilentAudioGateway.new(), input)
+	service.load_preferences()
+	assert_false(service.controls().has_custom_binding(), "tudo no padrao ao comecar")
+	assert_true(service.controls().set_binding("special", [KEY_Q]))
+	assert_eq(input.bindings()["special"], [KEY_Q], "a tecla chegou no input-gateway")
+	assert_eq(persistence.load_value("controls.special", []), [KEY_Q], "e foi gravada")
+
+
+func test_the_remap_comes_back_in_a_new_session() -> void:
+	var persistence := InMemoryPersistenceGateway.new()
+	var first := OptionsService.new(persistence, SilentAudioGateway.new(), SampleInputGateway.new())
+	first.load_preferences()
+	first.controls().set_binding("grab", [KEY_Z])
+	var restarted_input := SampleInputGateway.new()
+	var restarted := OptionsService.new(persistence, SilentAudioGateway.new(), restarted_input)
+	restarted.load_preferences()
+	assert_eq(restarted.controls().key_for("grab"), KEY_Z, "remap restaurado")
+	assert_eq(restarted_input.bindings()["grab"], [KEY_Z], "e aplicado no adapter restaurado")
+
+
+func test_without_an_input_gateway_there_is_nothing_to_remap() -> void:
+	var fx := _fixture()
+	var service: OptionsService = fx["service"]
+	assert_eq(service.controls().actions().size(), 0, "sem teclado nao ha acao")
+	assert_false(service.controls().begin_remap())
+	assert_false(service.controls().has_custom_binding())

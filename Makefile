@@ -59,6 +59,13 @@ capture-options: import
 capture-reviravolta: import
 	$(GODOT) --path . tools/capture_reviravolta.tscn -- res://docs/evidence
 
+# Prints de evidencia do ticket 10 (fechamento do v1): titulo, selecao, a Peleja
+# com os spritesheets desenhados pelo renderer de producao e o HUD final, o Golpe
+# Especial, as telas de vitoria/derrota/fim de arcade e as opcoes com remap.
+# Roda no modo `live` (e a arte de producao que precisa aparecer).
+capture-release: import
+	PELEJA_ADAPTERS=live $(GODOT) --path . tools/capture_release.tscn -- res://docs/evidence
+
 # Export web single-threaded (preset "Web" usa a variante nothreads).
 export: import
 	mkdir -p $(BUILD_DIR)

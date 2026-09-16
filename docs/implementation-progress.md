@@ -696,3 +696,154 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   arte gerada (ticket 9) com fallback em codigo, sem variacao por Arquetipo.
 - O comando de pular da cena usa a moldura ja existente do HUD (`MOVE_*`, `CONFIRM`,
   `CANCEL`, `JUMP` no input-gateway); o remap de controles fica no ticket 10.
+
+## Ticket 10 — Polimento e lancamento
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `src/application/services/game-flow-service.gd`: a maquina de navegacao do jogo
+  como estado puro. Titulo -> selecao -> Peleja -> (vitoria | Reviravolta ->
+  derrota) -> proxima Peleja, fim de arcade depois das sete e caminho de volta ao
+  titulo; opcoes como tela sobre a atual, com a tela de origem guardada. O resumo
+  da Peleja fica guardado quando ela fecha (continuar a campanha monta a proxima
+  Peleja e nao pode sobrescrever o que a tela de fim mostra).
+- `scenes/game.tscn` + `scenes/game.gd` (nova cena principal): unico lugar do
+  jogo que conhece os caminhos das cenas e troca a tela em cena. Fina -- quem
+  decide a proxima tela e o servico, que devolve a tela como dado; aqui so se
+  monta a cena, se ligam os sinais e se entrega o dado (o arcade, o resumo).
+  O `Esc` das telas de jogo abre as opcoes; titulo e opcoes tratam o cancelar
+  por conta propria.
+- `scenes/result_screen.gd` + `victory_screen`, `defeat_screen` e
+  `arcade_end_screen` (`.tscn`/`.gd`): as tres telas de fim, finas, desenhando o
+  modelo do `result-adapter` na resolucao base e confirmando pelo
+  input-gateway. A derrota diz que a campanha continua; o fim do arcade tem o
+  caminho de volta ao titulo.
+- `src/interface-adapters/result-adapter.gd`: copy pt-BR das tres telas (titulo de
+  VITORIA/DERROTA/ARCADE COMPLETO, linhas de apoio, dica), posicionamento,
+  barra de progresso do arcade e o invariante da Vantagem Oculta.
+- `src/interface-adapters/hud-adapter.gd` (completo): `fight_model` ganha a barra
+  de Especial por lado, `fight_hud_entries` entrega os retangulos do HUD (fundo e
+  preenchimento das duas barras de vida, das duas de Especial e os pips de round)
+  e `fight_hud_labels` entrega nome do Guardiao, nome do Oponente, relogio e a
+  linha do arcade, tudo posicionado na resolucao base. `arcade_model` monta
+  `PELEJA n/7`, o Oponente, o golpe-assinatura e a dificuldade em pt-BR. A vida
+  nunca entra como numero: `discloses_hidden_advantage()` segue valendo para o
+  modelo inteiro.
+- `scenes/fight.gd` (composicao da arte): com o renderer de producao montado, a
+  cena desenha ceu, chao, o turbilhao do Golpe Especial e OS DOIS lutadores pelos
+  spritesheets codificados (slug do Guardiao e do Oponente do arcade), em escala
+  inteira 3x, com a animacao vinda do estado e do golpe do dominio
+  (`animation_for`). O HUD final entra por cima: retangulos pelo render-gateway e
+  rotulos pela fonte bitmap. Sem renderer (modo `sample`) o modelo de retangulos
+  continua sendo a superficie de desenho.
+- `src/application/services/arcade-service.gd`: `reset()` desmonta a campanha
+  (volta ao titulo) sem quebrar o `execute()` que continua aceitando a ordem como
+  dado.
+- `src/application/services/match-service.gd`: `snapshot()` ganha as proporcoes
+  das duas barras de Especial (aditivo).
+- Remap de controles: `src/application/services/control-bindings.gd` (classe de
+  apoio -- acoes, tecla por acao, remap passo a passo e restauracao),
+  `input-gateway.gd` com `apply_bindings`/`bindings`/`action_names` por NOME de
+  acao, `keyboard-input-adapter.gd` lendo o mapa remapeado (comandos de menu
+  ficam fora do remap), `sample-input-gateway.gd` com um mapa deterministico sem
+  constante de engine e `options-service.gd` + `scenes/options_screen.gd` com a
+  linha CONTROLES (PADRAO/AJUSTADO) e o remap a partir do comando de agachar.
+  Cada mudanca e aplicada no gateway E gravada na persistencia.
+- Layout de toque revisado para tela pequena
+  (`src/interface-adapters/touch-input-adapter.gd`): botoes de 40 px de base (era
+  36), duas familias -- esquerda move/defende, direita golpeia --, sem
+  sobreposicao e fora da faixa do HUD (topo e informacao, nunca botao).
+- Dois nits de polimento: o painel da Reviravolta ganhou faixa escura tambem sob
+  o titulo e o nome da Forca Sobrenatural (alfa de 0,72 para 0,82), e o rodape da
+  tela de opcoes passou a caber dentro do painel (escala da dica reduzida e
+  verificada por teste).
+- `tools/perf/measure_web_fps.py`: caminho reproduzivel para remedir o fps do
+  jogo publicado num Chrome headless proprio via CDP (cliente WebSocket minimo,
+  so a stdlib), com o limite de taxa de quadro desligado. Nao completou uma
+  execucao nesta sessao -- o numero de fps registrado abaixo veio do contador de
+  `requestAnimationFrame` da propria sessao de evidencia.
+- `tools/capture_release.gd` + `.tscn` e o alvo `make capture-release`: as oito
+  telas do ticket em `docs/evidence/ticket-10-*.png`, no modo `live` (e a arte de
+  producao que precisa aparecer), dirigindo o jogo pela API publica.
+- Testes novos (61 no total): `test/application/test_game_flow_service.gd`,
+  `test/application/test_control_bindings.gd`,
+  `test/interface_adapters/test_result_adapter.gd`,
+  `test/interface_adapters/test_touch_layout.gd`,
+  `test/smoke/test_result_screens.gd` e `test/smoke/test_game_screen.gd` (arquivos
+  novos), mais casos novos em `test/interface_adapters/test_hud_adapter.gd`,
+  `test/application/test_options_service.gd`,
+  `test/interface_adapters/test_options_view_adapter.gd`,
+  `test/smoke/test_options_screen.gd` e `test/smoke/test_fight_screen.gd`. O unico
+  contrato de teste que mudou foi o do modelo de opcoes (a terceira linha,
+  CONTROLES).
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo **0** (rodado sem pipe): gdlint
+  `Success: no problems found`; GUT headless `491/491` testes e `234892` asserts
+  com `-gexit` (eram 430 testes e 234157 asserts em `128c51a`: esta fatia
+  acrescenta 61 testes); export web gerou `index.html`, `index.js`,
+  `index.pck` (`922632` bytes) e `index.wasm` (`39514754` bytes -- o tamanho
+  exato do `web_nothreads_release`, ou seja, single-threaded de sempre).
+- `make capture-release` sai com codigo 0 e grava 8 prints 426x240 em
+  `docs/evidence/ticket-10-*`: `title`, `select`, `fight-hud`, `fight-special`,
+  `victory`, `defeat`, `arcade-end` e `options-remap`. Saida real da ferramenta:
+  `peleja: hud=Saci superficie=true sprites=16 rotulos=4 arcade=PELEJA 1/7`
+  (os dois lutadores desenhados pelos spritesheets, com o HUD final e a linha do
+  arcade), `golpe especial: iniciou=true ativo=true barra=0.12` (o turbilhao na
+  janela ativa, com a barra de Especial consumida), `victory: titulo=VITÓRIA
+  pelea=1/7`, `defeat: titulo=DERROTA pelea=1/7`,
+  `arcade: pelejas=7 completo=true`, `arcade-end: titulo=ARCADE COMPLETO
+  pelea=7/7` e `opcoes: remap=true acao=block tecla=4194325 controles=true`.
+- HUD nao revela a Vantagem Oculta: o teste monta uma Peleja de verdade, le o
+  modelo de luta e o do arcade e prova que nenhuma chave proibida aparece em
+  nivel nenhum; `fight_hud_entries`/`fight_hud_labels` ficam dentro da resolucao
+  base.
+- Publicado: deploy de producao no Vercel
+  (`dpl_TzkdU9eAfwQoeP6bjcDBYXmB5piP`) em
+  `https://peleja-do-folclore-i6g0uphmi-rohones.vercel.app`. `curl` na URL de
+  producao: `status=200 content_type=text/html; charset=utf-8 size=5304`;
+  `index.wasm` responde `200 application/wasm` com `39514754` bytes; `index.pck`
+  responde `200` com `922632` bytes (batendo com o arquivo local).
+- **BLOCKER do alias:** `https://peleja.ronanrodrigo.dev` **nao resolve**
+  (`curl` exit 6, `Could not resolve host`; `dig` devolve NXDOMAIN). O dominio
+  esta atribuido ao projeto no Vercel, mas `vercel domains verify` responde
+  `action_required / invalid_configuration` e os nameservers de
+  `ronanrodrigo.dev` ainda sao os do Squarespace
+  (`nse1.squarespacedns.com`, ...). Falta um registro CNAME `peleja` ->
+  `cname.vercel-dns.com` no DNS do dominio; isso e uma mudanca fora do
+  repositorio e nao foi feita por mim.
+- FPS medido no jogo publicado (desktop): contador de `requestAnimationFrame` de
+  ~5 s na sessao de evidencia (HeadlessChrome 152, GPU real via ANGLE Metal /
+  Apple M4, viewport `1280x633`) -> **160 quadros com intervalo mediano de
+  `16,70 ms`, ou `59,88 fps`** (o p95 de `66,70 ms` cai em dois engasgos de
+  aquecimento do wasm/JIT e do inicio da aba; uma repeticao anterior na mesma
+  sessao, antes de a aba aquecer, mediu `29,94 fps`, a cadencia de ~30 Hz do
+  compositor headless). Print em `docs/evidence/ticket-10-publicado-desktop.png`.
+- FPS **NAO medido** no viewport de celular: no mesmo navegador a emulacao de
+  aparelho (390x844, dpr 3, canvas `1170x2532`) monta a tela certa -- e o print
+  `docs/evidence/ticket-10-publicado-mobile.png` prova o layout preservado em
+  letterbox -- mas o `requestAnimationFrame` nao disparou nessa aba depois da
+  emulacao, entao nao ha numero de FPS mobile a reportar. Nao afirmo 60 fps no
+  celular: fica como divida de verificacao.
+
+**Dividas assumidas nesta fatia**
+
+- ~~`peleja.ronanrodrigo.dev` nao resolve~~ -> CNAME do subdominio no DNS do
+  Squarespace (fora do repositorio); ate isso, o jogo publicado e a URL de
+  producao do Vercel.
+- FPS no viewport de celular nao foi medido: o navegador de evidencia nao
+  dispara `requestAnimationFrame` na aba emulada. O que existe e o print do
+  layout em 390x844 dpr 3.
+- A composicao da cena de luta desenha ceu/chao em constante, nao a arte gerada
+  `forest-arena`: o painel de arte continua na tela de titulo e na Reviravolta.
+- O oponente nao tem retrato no HUD (so o nome); o retrato do Oponente pediria
+  arte nova por Arquetipo (o ticket 9 gerou so o retrato do Saci).
+- O remap cobre as oito acoes de jogo; confirmar/cancelar seguem fixos de
+  proposito (o jogador nao se tranca fora do menu), e o toque nao tem remap (nao
+  ha teclas).
+- `scenes/title_screen.gd` ainda abre o menu de opcoes como filha da tela de
+  titulo (caminho proprio, coberto por teste); as demais telas passam pela tela
+  de opcoes do fluxo.

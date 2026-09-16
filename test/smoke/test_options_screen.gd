@@ -143,3 +143,49 @@ func _find_options_child(node: Node) -> Node:
 		if child.get("options_service") != null:
 			return child
 	return null
+
+## --- Remap de controles e rodape (ticket 10) ---
+
+func test_the_controls_row_shows_the_remap_state() -> void:
+	var rows: Array = _screen.view_adapter.view_model(70, false, false)["rows"]
+	assert_eq(rows.size(), 3, "volume, som e controles")
+	assert_eq(rows[2]["key"], OptionsViewAdapter.ROW_CONTROLS)
+	assert_eq(rows[2]["value"], "PADRÃO", "sem remap, controles no padrao")
+	assert_false(_screen.is_controls_custom(), "nada remapeado ainda")
+
+
+func test_the_remap_starts_from_the_screen_and_persists_the_key() -> void:
+	var gateway: SampleInputGateway = _container.input_gateway()
+	gateway.script_commands([InputGateway.Command.CROUCH])
+	await wait_process_frames(2)
+	assert_true(_screen.is_remapping(), "o comando de agachar comeca o remap")
+	var action: String = _screen.remap_action()
+	assert_false(action.is_empty(), "ha uma acao corrente para remapear")
+	assert_true(_screen.bind_key(KEY_Q), "a tecla apertada e aplicada")
+	assert_eq(
+		_container.persistence_gateway().load_value("controls." + action, []),
+		[KEY_Q],
+		"a tecla ficou gravada pelo gateway de persistencia injetado"
+	)
+	assert_true(_screen.is_controls_custom(), "a tela passa a mostrar controles ajustados")
+
+
+func test_cancelling_the_remap_keeps_the_screen_open() -> void:
+	var gateway: SampleInputGateway = _container.input_gateway()
+	_screen.begin_remap()
+	gateway.script_commands([InputGateway.Command.CANCEL])
+	await wait_process_frames(2)
+	assert_false(_screen.is_remapping(), "cancelar fecha o remap")
+	assert_true(_screen.visible, "mas nao fecha a tela de opcoes")
+
+
+func test_the_footer_stays_inside_the_panel() -> void:
+	var font := PixelFont.new()
+	var width: int = font.text_size(_screen.view_adapter.hint_text(), _screen.HINT_PIXEL_SCALE).x
+	var panel: Rect2i = _screen.PANEL_RECT
+	var centered_x: int = (426 - width) / 2
+	assert_true(centered_x >= panel.position.x, "rodape dentro do painel")
+	assert_true(
+		centered_x + width <= panel.end.x,
+		"o rodape nao encosta na borda direita (nit do ticket 10)"
+	)

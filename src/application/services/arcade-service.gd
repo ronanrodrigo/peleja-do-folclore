@@ -88,6 +88,16 @@ func execute(
 	return _start_current_fight()
 
 
+## Desmonta o arcade: nenhuma Peleja corrente, ordem vazia e resultados limpos.
+## E o que a volta ao titulo faz (ticket 10) -- a proxima campanha comeca do zero.
+func reset() -> void:
+	order = []
+	match_service = null
+	index = 0
+	results.clear()
+	_result_recorded = false
+
+
 ## Comando de selecao de Guardiao: a escolha chega como DADO de quem chama (o
 ## character-select-service devolve exatamente este nome). Vale para a proxima
 ## Peleja montada, nunca para a que ja esta em andamento.
