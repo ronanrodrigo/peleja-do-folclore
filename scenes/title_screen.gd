@@ -4,16 +4,20 @@ extends Control
 ## Fina: monta nos, conecta sinais e delega. A arte e placeholder e vive em
 ## dados dentro desta cena -- nenhum asset externo, nenhum PNG, nenhuma fonte
 ## de terceiros. O desenho acontece na resolucao base 426x240 e sobe em escala
-## inteira (3x no titulo, 2x no aviso), com filtro nearest.
+## inteira (3x no titulo, 2x no aviso), com filtro nearest; o texto sai da fonte
+## bitmap compartilhada (`PixelFont`), a mesma da tela de opcoes.
 ##
-## Nao guarda estado de jogo: apenas se o jogador ja mandou comecar.
+## O audio entra por dois gestos explicitos: a trilha de titulo e pedida aqui (no
+## web ela fica guardada ate o primeiro gesto, por causa da politica de autoplay
+## do navegador) e o primeiro comando do jogador destrava a saida.
+##
+## Nao guarda estado de jogo: apenas se o jogador ja mandou comecar, se as opcoes
+## estao abertas e se a trilha ja foi pedida.
 
 signal started
 
 const BASE_WIDTH := 426
 const BASE_HEIGHT := 240
-const GLYPH_WIDTH := 5
-const GLYPH_SPACING := 1
 const TITLE_PIXEL_SCALE := 3
 const PROMPT_PIXEL_SCALE := 2
 const BLINK_INTERVAL := 0.55
@@ -24,6 +28,9 @@ const BACKDROP_SLUG := "forest-arena"
 
 const BACKDROP_SOURCE_GENERATED := "generated"
 const BACKDROP_SOURCE_CODE := "code"
+
+## Tela de opcoes aberta pelo `Esc` (o menu completo entra no polimento).
+const OPTIONS_SCENE := "res://scenes/options_screen.tscn"
 
 const TITLE_TEXT := "PELEJA DO FOLCLORE"
 const PROMPT_TEXT := "PRESSIONE PARA COMEÇAR"
@@ -41,59 +48,14 @@ const TITLE_Y := 58
 const SEPARATOR_Y := 92
 const PROMPT_Y := 150
 
-## Fonte bitmap 5x7 escrita a mao: cada glifo e uma sequencia de linhas de 5
-## colunas separadas por "/". "#" acende o pixel. "Ç" usa 8 linhas (cedilha).
-const FONT_GLYPHS := {
-	"A": ".###./#...#/#...#/#####/#...#/#...#/#...#",
-	"B": "####./#...#/#...#/####./#...#/#...#/####.",
-	"C": ".###./#...#/#..../#..../#..../#...#/.###.",
-	"D": "####./#...#/#...#/#...#/#...#/#...#/####.",
-	"E": "#####/#..../#..../####./#..../#..../#####",
-	"F": "#####/#..../#..../####./#..../#..../#....",
-	"G": ".###./#...#/#..../#.###/#...#/#...#/.###.",
-	"H": "#...#/#...#/#...#/#####/#...#/#...#/#...#",
-	"I": "#####/..#../..#../..#../..#../..#../#####",
-	"J": "..###/...#./...#./...#./...#./#..#./.##..",
-	"K": "#...#/#..#./#.#../##.../#.#../#..#./#...#",
-	"L": "#..../#..../#..../#..../#..../#..../#####",
-	"M": "#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#",
-	"N": "#...#/##..#/#.#.#/#..##/#...#/#...#/#...#",
-	"O": ".###./#...#/#...#/#...#/#...#/#...#/.###.",
-	"P": "####./#...#/#...#/####./#..../#..../#....",
-	"Q": ".###./#...#/#...#/#...#/#.#.#/#..#./.##.#",
-	"R": "####./#...#/#...#/####./#.#../#..#./#...#",
-	"S": ".####/#..../#..../.###./....#/....#/####.",
-	"T": "#####/..#../..#../..#../..#../..#../..#..",
-	"U": "#...#/#...#/#...#/#...#/#...#/#...#/.###.",
-	"V": "#...#/#...#/#...#/#...#/#...#/.#.#./..#..",
-	"W": "#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#",
-	"X": "#...#/#...#/.#.#./..#../.#.#./#...#/#...#",
-	"Y": "#...#/#...#/.#.#./..#../..#../..#../..#..",
-	"Z": "#####/....#/...#./..#../.#.../#..../#####",
-	"Ç": ".###./#...#/#..../#..../#..../#...#/.###./..##.",
-	"0": ".###./#...#/#..##/#.#.#/##..#/#...#/.###.",
-	"1": "..#../.##../..#../..#../..#../..#../.###.",
-	"2": ".###./#...#/....#/...#./..#../.#.../#####",
-	"3": "####./....#/....#/.###./....#/....#/####.",
-	"4": "...#./..##./.#.#./#..#./#####/...#./...#.",
-	"5": "#####/#..../####./....#/....#/#...#/.###.",
-	"6": ".###./#..../#..../####./#...#/#...#/.###.",
-	"7": "#####/....#/...#./..#../.#.../.#.../.#...",
-	"8": ".###./#...#/#...#/.###./#...#/#...#/.###.",
-	"9": ".###./#...#/#...#/.####/....#/....#/.###.",
-	" ": "...../...../...../...../...../...../.....",
-	"!": "..#../..#../..#../..#../..#../...../..#..",
-	"-": "...../...../...../...../.####/...../.....",
-	".": "...../...../...../...../...../...../..#..",
-	"?": ".###./#...#/....#/...#./..#../...../..#..",
-}
-
 var _started: bool = false
+var _options_open: bool = false
 var _blink_elapsed: float = 0.0
 var _backdrop_source: String = BACKDROP_SOURCE_CODE
 
 var _title_texture: TextureRect
 var _prompt_text: TextureRect
+var _options_screen: Control = null
 
 
 func _ready() -> void:
@@ -102,18 +64,22 @@ func _ready() -> void:
 	_build_separator()
 	_title_texture = _build_text_node(TITLE_TEXT, TITLE_PIXEL_SCALE, COLOR_TITLE, TITLE_Y)
 	_prompt_text = _build_text_node(PROMPT_TEXT, PROMPT_PIXEL_SCALE, COLOR_PROMPT, PROMPT_Y)
+	_start_audio()
 
 
 func _process(delta: float) -> void:
 	_poll_scripted_input()
-	if _started:
+	if _started or _options_open:
 		return
 	_blink_elapsed += delta
 	_prompt_text.visible = fmod(_blink_elapsed, BLINK_INTERVAL * 2.0) < BLINK_INTERVAL
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _started:
+	if _started or _options_open:
+		return
+	if event.is_action_pressed("ui_cancel"):
+		open_options()
 		return
 	if event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_select"):
 		_start()
@@ -135,13 +101,66 @@ func has_started() -> bool:
 	return _started
 
 
+func options_open() -> bool:
+	return _options_open
+
+
+## Abre a tela de opcoes como filha (o menu completo e do polimento, ticket 10).
+func open_options() -> void:
+	if _options_open:
+		return
+	var scene: PackedScene = load(OPTIONS_SCENE)
+	if scene == null:
+		return
+	_options_open = true
+	_options_screen = scene.instantiate()
+	_options_screen.closed.connect(_on_options_closed)
+	add_child(_options_screen)
+
+
+func _on_options_closed() -> void:
+	_options_open = false
+	if _options_screen != null and is_instance_valid(_options_screen):
+		_options_screen.queue_free()
+	_options_screen = null
+	if not _started:
+		_prompt_text.visible = true
+
+
 func _start() -> void:
 	_started = true
-	_prompt_text.texture = _make_text_texture(STARTED_TEXT, PROMPT_PIXEL_SCALE, COLOR_PROMPT)
+	_declare_gesture()
+	_prompt_text.texture = PixelFont.new().text_texture(
+		STARTED_TEXT, PROMPT_PIXEL_SCALE, COLOR_PROMPT
+	)
 	_prompt_text.size = _prompt_text.texture.get_size()
 	_center_horizontally(_prompt_text)
 	_prompt_text.visible = true
 	started.emit()
+
+
+## Pede a trilha de titulo. No navegador ela so toca depois do primeiro gesto.
+func _start_audio() -> void:
+	var audio: Variant = _audio_gateway()
+	if audio == null:
+		return
+	audio.play_music(AudioGateway.MUSIC_TITLE)
+
+
+## Declara o gesto do jogador: e o que destrava o audio no web (autoplay).
+func _declare_gesture() -> void:
+	var audio: Variant = _audio_gateway()
+	if audio == null:
+		return
+	if not audio.is_audio_unlocked():
+		audio.notify_user_gesture()
+
+
+func _audio_gateway() -> Variant:
+	var container: Variant = get_node_or_null("/root/app_container")
+	if container == null or not container.has_method("audio_gateway"):
+		return null
+	return container.audio_gateway()
 
 
 ## Drena comandos do input-gateway injetado, para automacao e testes. Nenhum
@@ -255,7 +274,7 @@ func _build_separator() -> void:
 func _build_text_node(text: String, pixel_scale: int, color: Color, y: int) -> TextureRect:
 	var node := TextureRect.new()
 	node.name = "TitleText" if pixel_scale == TITLE_PIXEL_SCALE else "PromptText"
-	node.texture = _make_text_texture(text, pixel_scale, color)
+	node.texture = PixelFont.new().text_texture(text, pixel_scale, color)
 	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	node.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	node.stretch_mode = TextureRect.STRETCH_SCALE
@@ -269,37 +288,3 @@ func _build_text_node(text: String, pixel_scale: int, color: Color, y: int) -> T
 
 func _center_horizontally(node: Control) -> void:
 	node.position = Vector2((BASE_WIDTH - int(node.size.x)) / 2, node.position.y)
-
-
-## Converte texto em textura pela fonte bitmap, ja em escala inteira.
-func _make_text_texture(text: String, pixel_scale: int, color: Color) -> ImageTexture:
-	assert(pixel_scale >= 1, "escala de pixel tem de ser inteira e >= 1")
-	var glyphs: Array = []
-	var tallest := 1
-	for index in text.length():
-		var rows := _glyph_rows(text.substr(index, 1))
-		glyphs.append(rows)
-		tallest = maxi(tallest, rows.size())
-	var source_width := maxi(
-		text.length() * (GLYPH_WIDTH + GLYPH_SPACING) - GLYPH_SPACING, 1
-	)
-	var image := Image.create_empty(source_width, tallest, false, Image.FORMAT_RGBA8)
-	image.fill(Color(0, 0, 0, 0))
-	var pen_x := 0
-	for rows in glyphs:
-		for row_index in rows.size():
-			var row: String = rows[row_index]
-			for column in row.length():
-				if row.substr(column, 1) == "#":
-					image.set_pixel(pen_x + column, row_index, color)
-		pen_x += GLYPH_WIDTH + GLYPH_SPACING
-	if pixel_scale > 1:
-		image.resize(
-			source_width * pixel_scale, tallest * pixel_scale, Image.INTERPOLATE_NEAREST
-		)
-	return ImageTexture.create_from_image(image)
-
-
-func _glyph_rows(character: String) -> PackedStringArray:
-	var encoded: String = FONT_GLYPHS.get(character, FONT_GLYPHS["?"])
-	return encoded.split("/")

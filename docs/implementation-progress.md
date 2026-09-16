@@ -492,3 +492,120 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   tocados nesta fatia: os dados dos Oponentes vivem nos arquivos novos
   (`opponent_profile.gd`, `meter_steal_move.gd`), o que evita conflito com os
   tickets 5 e 8, que rodam em paralelo e tambem escrevem nesses arquivos.
+
+## Ticket 8 — Audio: SFX e chiptune
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `tools/audio/build_chiptune.py` (fronteira de autoria, fora das camadas do
+  jogo): sintetiza TODO o audio do projeto com so a stdlib do Python --
+  osciladores quadrado/triangular/serra, ruido por LFSR e um sequenciador
+  chiptune em grade de notas. Deterministico (`--verify` confere byte a byte) e
+  sem dependencia externa. `make audio` regera; `make test-audio` confere.
+- `assets/audio/sfx/` (8 WAV, 22050 Hz mono): `impact_light`, `impact_heavy`,
+  `special`, `damage`, `knockout`, `select`, `navigate`, `round_end`.
+- `assets/audio/music/` (5 WAV, 11025 Hz mono, com loop no playback): `title`,
+  `select`, `fight`, `reviravolta`, `result`.
+- `assets/audio/CREDITS.md`: origem (sintetizado no projeto pelo gerador, nenhuma
+  amostra, nenhum banco de sons, nada baixado da internet) e licenca (obra do
+  proprio repositorio, sem obrigacao de atribuicao a terceiros).
+- `src/application/gateways/audio-gateway.gd` (extensao por adicao): capacidades
+  fechadas em ingles -- `SFX_KINDS` e `MUSIC_CONTEXTS` -- e o gesto do jogador
+  (`notify_user_gesture`, `is_audio_unlocked`), que e como o jogo trata a
+  politica de autoplay do navegador.
+- `src/infrastructure/godot-audio-gateway.gd`: adapter de producao. Um
+  `AudioStreamPlayer` para a musica (com loop calculado do WAV), 4 vozes de SFX,
+  volume mudo no barramento `Master` do `AudioServer`, capacidade desconhecida
+  ignorada e nenhum som antes do gesto (a trilha fica guardada e toca no gesto).
+- `src/infrastructure/local-persistence-gateway.gd`: adapter de producao. JSON em
+  `user://peleja/preferences.json` (no web, o armazenamento do navegador);
+  arquivo ausente ou com payload estranho nao derruba o jogo.
+- `src/application/services/options-service.gd`: caso de uso das opcoes de audio.
+  Cada mudanca de volume/mudo e aplicada no audio E gravada na mesma chamada, em
+  10 passos de volume; os efeitos de menu do contrato (`navigate` ao mexer no
+  volume, `select` ao alternar o mudo e ao confirmar) saem daqui.
+- `src/interface-adapters/options-view-adapter.gd`: copy pt-BR na borda de
+  apresentacao (`OPÇÕES`, `VOLUME`, `SOM`, `LIGADO`/`MUDO`, dica de teclas) e o
+  modelo que a cena desenha.
+- `src/interface-adapters/pixel-font.gd`: fonte bitmap 5x7 extraida da tela de
+  titulo e compartilhada (ganhou `Õ`, `%` e `:`), com `supports()` para o teste
+  garantir que a copy tem glifo.
+- `scenes/options_screen.tscn` + `.gd`: tela fina em 426x240, escala inteira,
+  filtro nearest. `MOVE_LEFT`/`A` abaixa o volume, `MOVE_RIGHT`/`D` sobe,
+  `CONFIRM`/`Enter` alterna o mudo, `CANCEL`/`Esc` volta; ela pede a trilha de
+  menu e declara o gesto do jogador.
+- `scenes/title_screen.gd`: passou a usar a `PixelFont` compartilhada, pede a
+  trilha de titulo e abre a tela de opcoes no `Esc` (o menu completo e do ticket
+  10); o primeiro comando do jogador e o gesto que destrava o audio.
+- `autoloads/app_container.gd`: no modo `live`, monta o adapter de audio no
+  proprio autoload -- a trilha atravessa a troca de cenas. O modo `sample`
+  continua sem montar nada (o adapter silencioso nao toca nada).
+- `src/application/services/match-service.gd`: efeitos do contrato a partir da
+  Peleja -- impacto leve/pesado pelo golpe que conectou, `damage` quando o
+  Guardiao apanha, `knockout` no nocaute e `special` ao armar o Golpe Especial.
+  O fim da Peleja troca o contexto musical: vitoria do Oponente ->
+  `reviravolta` (a Reviravolta entra em cena), vitoria do Guardiao -> `result`
+  (`final_music_context()`).
+- `tools/capture_options.gd` + `.tscn` e o alvo `make capture-options`:
+  ferramenta de evidencia que mexe no volume e no mudo pelo caso de uso real e
+  grava print 426x240.
+- `docs/audio.md`: capacidades, camadas, preferencias, autoplay e evidencia.
+- Testes: `test/application/test_match_audio.gd`,
+  `test/application/test_options_service.gd`,
+  `test/infrastructure/test_godot_audio_gateway.gd`,
+  `test/infrastructure/test_local_persistence_gateway.gd`,
+  `test/interface_adapters/test_options_view_adapter.gd`,
+  `test/smoke/test_options_screen.gd`, um caso novo em
+  `test/smoke/test_sample_adapters.gd` (contrato + gesto no adapter silencioso) e
+  os ajustes de `test/smoke/test_app_container.gd` (audio e persistencia agora
+  tem adapter de producao e caem para `sample` se e somente se o arquivo nao
+  existir).
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT
+  headless `291/291` testes e `23656` asserts com `-gexit` (eram 239 testes e
+  23132 asserts no ticket 4: esta fatia acrescenta 52 testes); export web gerou
+  `index.html`, `index.js`, `index.pck` (`482256` bytes) e `index.wasm`
+  (`39514754` bytes, a variante single-threaded de sempre).
+- `python3 tools/audio/build_chiptune.py --verify` -> `13 artefatos conferem byte
+  a byte com o gerador` (8 SFX + 5 trilhas, ~1,0 MB em `assets/audio/`).
+- Adapter sample silencioso usado nos testes sem I/O: GUT
+  `test_sample_adapters.gd` -> `8/8 passed`, incluindo
+  `test_sample_adapters_do_not_perform_io` (nenhum dos cinco adapters sample
+  contem `FileAccess`, `DirAccess`, `AudioServer`, `HTTPRequest`, `res://` ou
+  `user://`) e `test_sample_audio_gateway_covers_the_contract_and_the_player_gesture`.
+- Volume e mudo persistidos (gravar, recarregar e ler de volta):
+  `test_options_service.gd` -> `8/8 passed`
+  (`test_preferences_survive_a_new_session` restaura 0.3 e mudo numa nova
+  instancia do caso de uso) e `test_local_persistence_gateway.gd` -> `8/8 passed`
+  (`test_values_survive_a_new_gateway_instance` faz o mesmo por uma nova
+  instancia do adapter de producao, lendo o arquivo de verdade).
+- Troca de contexto musical ao entrar na luta e na Reviravolta:
+  `test_match_audio.gd` -> `6/6 passed`, com
+  `test_entering_the_fight_switches_the_music_context` (contexto `fight` no
+  inicio da Peleja) e
+  `test_reviravolta_context_when_the_opponent_wins_the_match` (o Oponente vence e
+  o contexto passa a `reviravolta`), mais
+  `test_result_context_when_the_guardian_wins_the_match` (vitoria do Guardiao
+  fecha em `result`).
+- `make capture-options` sai com codigo 0 e grava dois prints 426x240 em
+  `docs/evidence/`: `ticket-08-options-volume-70.png` (volume 70% e som LIGADO) e
+  `ticket-08-options-muted.png` (som MUDO). O estado vem do `OptionsService`
+  pelos gateways injetados pelo composition root, nao de valor fixo na cena.
+- Direcao de dependencia preservada: nenhum caso de uso instancia adapter
+  concreto; o pool de players e o barramento `Master` vivem no adapter de
+  producao; `src/domain/` continua sem tocar em audio, arquivo ou engine.
+
+**Dividas assumidas nesta fatia**
+
+- O menu de opcoes entra no escopo pelo `Esc` da tela de titulo; o menu completo
+  (com remap de controles e navegacao entre telas) fica no ticket 10.
+- A tela de Reviravolta do ticket 7 nao existe nesta onda: o contexto musical
+  `reviravolta` ja e escolhido e testado no fim da Peleja vencida pelo Oponente,
+  e a cena do ticket 7 so precisa pedir a trilha ao entrar (o gateway ja a tem em
+  loop).
+- Os WAV sao commitados como artefato (o gerador documenta como foram feitos);
+  nenhuma dependencia externa de audio foi adicionada.

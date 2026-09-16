@@ -4,7 +4,7 @@ TEST_DIR ?= res://test
 WEB_PRESET ?= Web
 BUILD_DIR ?= build/web
 
-.PHONY: run import test lint export verify clean test-art capture-saci capture-cast capture-opponents
+.PHONY: run import test lint export verify clean test-art test-audio audio capture-saci capture-cast capture-opponents capture-options
 
 run:
 	$(GODOT) --path .
@@ -38,6 +38,19 @@ capture-cast: import
 # sprite-render-adapter de producao, um print por Arquetipo, em docs/evidence/.
 capture-opponents: import
 	$(GODOT) --path . tools/capture_opponents.tscn -- res://docs/evidence
+# Audio: SFX e musica chiptune sintetizados no projeto (deterministico; os WAV
+# gerados sao commitados em assets/audio/ com origem e licenca em CREDITS.md).
+audio:
+	python3 tools/audio/build_chiptune.py
+
+# Confere que cada WAV commitado confere byte a byte com o gerador.
+test-audio:
+	python3 tools/audio/build_chiptune.py --verify
+
+# Print de evidencia do ticket 8: tela de opcoes com volume e mudo, em
+# docs/evidence/ticket-08-*.png.
+capture-options: import
+	$(GODOT) --path . tools/capture_options.tscn -- res://docs/evidence
 
 # Export web single-threaded (preset "Web" usa a variante nothreads).
 export: import

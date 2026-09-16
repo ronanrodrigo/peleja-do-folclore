@@ -139,4 +139,51 @@ func test_live_mode_uses_the_production_adapter_where_it_exists() -> void:
 		live_container.touch_input_gateway() is InputGateway,
 		"o toque tambem e instanciado pelo composition root"
 	)
+	assert_eq(live_container.origin("audio"), "live", "audio usa o godot-audio-gateway")
+	assert_eq(
+		live_container.origin("persistence"), "live", "persistence usa o local-persistence-gateway"
+	)
+	assert_true(live_container.audio_gateway() is AudioGateway, "gateway de audio injetado")
+	assert_true(
+		live_container.persistence_gateway() is PersistenceGateway,
+		"gateway de persistencia injetado"
+	)
 	OS.set_environment("PELEJA_ADAPTERS", SAMPLE_ENV)
+
+
+func test_audio_capability_now_has_a_production_adapter() -> void:
+	assert_false(
+		_container.missing_production().has("audio"),
+		"o godot-audio-gateway de producao existe desde o ticket 8"
+	)
+
+
+func test_persistence_capability_now_has_a_production_adapter() -> void:
+	assert_false(
+		_container.missing_production().has("persistence"),
+		"o local-persistence-gateway de producao existe desde o ticket 8"
+	)
+
+
+func test_audio_capability_falls_back_to_sample_only_when_production_is_missing() -> void:
+	var reported_missing: bool = _container.missing_production().has("audio")
+	var production_missing: bool = not ResourceLoader.exists(
+		CONTAINER.PRODUCTION_ADAPTERS["audio"]
+	)
+	assert_eq(
+		reported_missing,
+		production_missing,
+		"audio cai para sample se e somente se nao tem adapter de producao"
+	)
+
+
+func test_persistence_capability_falls_back_to_sample_only_when_production_is_missing() -> void:
+	var reported_missing: bool = _container.missing_production().has("persistence")
+	var production_missing: bool = not ResourceLoader.exists(
+		CONTAINER.PRODUCTION_ADAPTERS["persistence"]
+	)
+	assert_eq(
+		reported_missing,
+		production_missing,
+		"persistence cai para sample se e somente se nao tem adapter de producao"
+	)

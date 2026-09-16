@@ -262,7 +262,10 @@ func _apply_attack_command(command: int) -> bool:
 	if move != null:
 		return guardian.start_move(move)
 	if command == InputGateway.Command.SPECIAL:
-		return guardian.start_special(special_move)
+		var started := guardian.start_special(special_move)
+		if started:
+			_sfx(AudioGateway.SFX_SPECIAL)
+		return started
 	return false
 
 
@@ -302,20 +305,31 @@ func _apply_opponent_ai() -> void:
 		OpponentAi.Action.SIGNATURE:
 			opponent.start_move(opponent_signature)
 		OpponentAi.Action.SPECIAL:
-			opponent.start_special(opponent_special_move)
+			if opponent.start_special(opponent_special_move):
+				_sfx(AudioGateway.SFX_SPECIAL)
 		_:
 			pass
 
 
+## Golpes que conectaram neste tick viram efeito sonoro: o cue do impacto vem do
+## golpe do atacante (leve/pesado/especial) e o cue de dano e do lado do jogador
+## que apanhou; nocaute tem cue proprio.
 func _resolve_combat() -> void:
 	# O golpe do Oponente e lido ANTES da resolucao: quem apanha perde o golpe em
 	# andamento, e o roubo de barra precisa saber qual golpe conectou.
+	var guardian_move := guardian.current_move
 	var opponent_move := opponent.current_move
 	var guardian_damage := guardian.resolve_hit(opponent)
 	var opponent_damage := opponent.resolve_hit(guardian)
-	if guardian_damage > 0 or opponent_damage > 0:
-		_sfx("hit")
+	if guardian_damage > 0:
+		_sfx(_impact_kind(guardian_move))
+		if opponent.is_knocked_out():
+			_sfx(AudioGateway.SFX_KNOCKOUT)
 	if opponent_damage > 0:
+		_sfx(_impact_kind(opponent_move))
+		_sfx(AudioGateway.SFX_DAMAGE)
+		if guardian.is_knocked_out():
+			_sfx(AudioGateway.SFX_KNOCKOUT)
 		_apply_meter_steal(opponent_move)
 
 
@@ -329,6 +343,18 @@ func _apply_meter_steal(move: Move) -> void:
 	if not meter_steal.is_named(move.display_name):
 		return
 	meter_stolen += meter_steal.steal_from(guardian, opponent)
+
+## Peso do impacto pelo golpe que conectou. Golpe desconhecido cai no leve.
+func _impact_kind(move: Move) -> String:
+	if move == null:
+		return AudioGateway.SFX_IMPACT_LIGHT
+	match move.kind:
+		Move.Kind.HEAVY, Move.Kind.GRAB:
+			return AudioGateway.SFX_IMPACT_HEAVY
+		Move.Kind.SPECIAL:
+			return AudioGateway.SFX_SPECIAL
+		_:
+			return AudioGateway.SFX_IMPACT_LIGHT
 
 
 func _face_each_other() -> void:
@@ -344,13 +370,22 @@ func _resolve_round_end() -> void:
 		return
 	last_round_result = result
 	rules.register_round(result)
-	_sfx("round_end")
+	_sfx(AudioGateway.SFX_ROUND_END)
 	if rules.is_decided():
 		phase = Phase.MATCH_OVER
-		_music("result")
+		_music(final_music_context())
 		return
 	phase = Phase.ROUND_OVER
 	_round_pause_ticks = ROUND_PAUSE_TICKS
+
+
+## Contexto musical do fim da Peleja: quando o Oponente vence, quem entra em cena
+## e a Reviravolta, e ela tem trilha propria (o ticket 7 desenha o painel; aqui a
+## troca de contexto ja acontece no fim da Peleja).
+func final_music_context() -> String:
+	if winner() == MatchRules.Winner.OPPONENT:
+		return AudioGateway.MUSIC_REVIRAVOLTA
+	return AudioGateway.MUSIC_RESULT
 
 
 func _begin_round() -> void:
@@ -361,7 +396,7 @@ func _begin_round() -> void:
 	_face_each_other()
 	_round_pause_ticks = 0
 	phase = Phase.ROUND_ACTIVE
-	_music("fight")
+	_music(AudioGateway.MUSIC_FIGHT)
 
 
 ## Desenha o frame pelo render-gateway injetado (escala inteira, sem suavizacao).
