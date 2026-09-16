@@ -42,7 +42,7 @@ func test_every_character_of_the_copy_has_a_glyph_in_the_bitmap_font() -> void:
 	texts.append_array(_adapter.lines())
 	for text in texts:
 		for index in text.length():
-			var character := text.substr(index, 1)
+			var character: String = text.substr(index, 1)
 			assert_true(
 				BitmapFont.FONT_GLYPHS.has(character),
 				"glifo proprio para '%s' em '%s'" % [character, text]

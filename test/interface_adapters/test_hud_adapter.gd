@@ -94,6 +94,9 @@ func test_the_bitmap_font_covers_the_accented_uppercase_copy() -> void:
 	var image := BitmapFont.make_image("PEs", Color8(255, 255, 255))
 	assert_eq(image.get_height(), BitmapFont.GLYPH_HEIGHT)
 	assert_gt(image.get_width(), 0)
+	var accented := BitmapFont.make_image("FORÇA", Color8(255, 255, 255))
+	assert_eq(accented.get_height(), 8, "a imagem acompanha o glifo mais alto (cedilha)")
+	assert_eq(accented.get_width(), BitmapFont.text_width("FORÇA"), "largura do texto em pixels")
 
 
 ## Peleja de verdade com adapters `sample`, so para o HUD ler o retrato real.

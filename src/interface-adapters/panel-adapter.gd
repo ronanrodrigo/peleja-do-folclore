@@ -43,7 +43,8 @@ const COLOR_TITLE := Color8(255, 211, 92)
 const COLOR_FORCE := Color8(143, 224, 208)
 const COLOR_LINE := Color8(240, 240, 255)
 const COLOR_HINT := Color8(150, 150, 190)
-const COLOR_BAND := Color8(6, 10, 18, 0.72)
+## Faixa escura semitransparente: nao e `Color8` porque a faixa tem alfa.
+const COLOR_BAND := Color(6.0 / 255.0, 10.0 / 255.0, 18.0 / 255.0, 0.72)
 const COLOR_BORDER := Color8(255, 211, 92)
 
 
@@ -79,7 +80,11 @@ func skip_hint() -> String:
 ## fala corrente e o comando de pular, tudo ja posicionado na resolucao base.
 ## `line_index` negativo (voz terminada) mostra a ultima fala em vez de nada.
 func view_model(line_index: int) -> Dictionary:
-	var shown := clampi(line_index, 0, LINES.size() - 1)
+	# `line_index` negativo significa voz terminada (o efeito da Forca esta na
+	# tela): a ultima fala fica, em vez de a cena ficar muda.
+	var shown := LINES.size() - 1
+	if line_index >= 0:
+		shown = clampi(line_index, 0, LINES.size() - 1)
 	return {
 		"line_count": LINES.size(),
 		"line_index": line_index,

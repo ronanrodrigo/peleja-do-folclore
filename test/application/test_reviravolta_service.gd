@@ -5,7 +5,6 @@ extends GutTest
 ## arcade fica no persistence-gateway.
 
 const PANEL_BYTES := 426 * 240 * 4
-const LINES := PanelAdapter.LINES.size()
 const MAX_TICKS := 900
 
 
@@ -18,6 +17,12 @@ func _panel_pixels() -> PackedByteArray:
 	pixels[0] = 255
 	pixels[PANEL_BYTES - 1] = 255
 	return pixels
+
+
+## Quantas falas tem a cena: o servico recebe o tamanho como dado do chamador,
+## nunca descobre sozinho qual e a copy (a copy vive na borda de apresentacao).
+func _lines() -> int:
+	return PanelAdapter.LINES.size()
 
 
 func _fixture(with_panel: bool) -> Dictionary:
@@ -69,7 +74,7 @@ func test_the_reviravolta_only_plays_when_the_opponent_wins_the_match() -> void:
 func test_the_full_panel_art_comes_from_the_asset_gateway_by_slug() -> void:
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 3)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 3)
 	assert_eq(service.snapshot()["panel_source"], ReviravoltaService.SOURCE_GATEWAY)
 	assert_eq(service.panel_pixels(), _panel_pixels(), "os pixels sao os do slug do gateway")
 	assert_eq(service.panel_pixels().size(), PANEL_BYTES, "painel de tela cheia 426x240 RGBA8")
@@ -80,7 +85,7 @@ func test_the_full_panel_art_comes_from_the_asset_gateway_by_slug() -> void:
 func test_without_the_panel_art_the_service_draws_a_neutral_panel() -> void:
 	var fx := _fixture(false)
 	var service: ReviravoltaService = fx["service"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 1)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 1)
 	assert_eq(service.snapshot()["panel_source"], ReviravoltaService.SOURCE_BLANK)
 	assert_eq(service.panel_pixels().size(), PANEL_BYTES, "o jogo nao quebra sem arte")
 	assert_ne(service.panel_pixels(), _panel_pixels(), "e o painel neutro, nao a arte de outro slug")
@@ -90,7 +95,7 @@ func test_entering_the_reviravolta_switches_the_music_and_calls_the_force() -> v
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
 	var audio: SilentAudioGateway = fx["audio"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 1)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 1)
 	assert_eq(audio.last_music(), AudioGateway.MUSIC_REVIRAVOLTA, "trilha da Reviravolta")
 	assert_eq(audio.sfx_calls, [AudioGateway.SFX_SPECIAL], "a Forca entra em cena com cue proprio")
 
@@ -98,7 +103,7 @@ func test_entering_the_reviravolta_switches_the_music_and_calls_the_force() -> v
 func test_the_scene_advances_alone_through_the_phases_and_ends() -> void:
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 2)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 2)
 	var phases := _run_to_end(service)
 	assert_eq(phases, ["voice", "wind", "root", "dissolve", "done"], "a cena rola sozinha")
 	assert_true(service.is_finished(), "a cena terminou sem nenhuma interacao")
@@ -106,14 +111,14 @@ func test_the_scene_advances_alone_through_the_phases_and_ends() -> void:
 	assert_false(service.was_skipped(), "terminou pelo tempo, nao pelo comando de pular")
 	assert_true(service.snapshot()["opponent_dissolved"], "o Oponente foi dissolvido")
 	assert_eq(service.phase_name(), "done")
-	assert_eq(service.snapshot()["ticks"], ReviravoltaRule.total_ticks(LINES))
+	assert_eq(service.snapshot()["ticks"], ReviravoltaRule.total_ticks(_lines()))
 
 
 func test_the_force_cues_are_the_contract_ones_and_happen_once_per_phase() -> void:
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
 	var audio: SilentAudioGateway = fx["audio"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 1)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 1)
 	_run_to_end(service)
 	assert_eq(
 		audio.sfx_calls,
@@ -133,7 +138,7 @@ func test_the_wind_and_the_roots_are_drawn_through_the_render_gateway() -> void:
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
 	var render: SampleRenderGateway = fx["render"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 1)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 1)
 	while service.phase_name() != "wind":
 		service.advance_tick()
 	service.render_frame()
@@ -154,7 +159,7 @@ func test_the_effects_are_deterministic_for_the_same_ticks() -> void:
 	var first: ReviravoltaService = _fixture(true)["service"]
 	var second: ReviravoltaService = _fixture(true)["service"]
 	for service in [first, second]:
-		service.execute(MatchRules.Winner.OPPONENT, LINES, 1)
+		service.execute(MatchRules.Winner.OPPONENT, _lines(), 1)
 		for _tick in 200:
 			service.advance_tick()
 	assert_eq(first.render_model(), second.render_model(), "mesma fase e mesmo tick: mesmo desenho")
@@ -164,7 +169,7 @@ func test_the_effects_are_deterministic_for_the_same_ticks() -> void:
 func test_the_scene_can_be_skipped() -> void:
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 1)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 1)
 	for _tick in ReviravoltaRule.TICKS_PER_LINE:
 		service.advance_tick()
 	assert_eq(service.snapshot()["line_index"], 1, "a voz ja avancou uma linha")
@@ -181,7 +186,7 @@ func test_the_arcade_progress_is_kept_and_the_campaign_never_dies() -> void:
 	var fx := _fixture(true)
 	var service: ReviravoltaService = fx["service"]
 	var persistence: InMemoryPersistenceGateway = fx["persistence"]
-	service.execute(MatchRules.Winner.OPPONENT, LINES, 4)
+	service.execute(MatchRules.Winner.OPPONENT, _lines(), 4)
 	var stored: Dictionary = fx["persistence"].load_value(ReviravoltaService.CAMPAIGN_KEY, {})
 	assert_eq(stored["fight"], 4, "a Peleja em que a Reviravolta aconteceu")
 	assert_false(stored["campaign_over"], "a campanha continua viva")
