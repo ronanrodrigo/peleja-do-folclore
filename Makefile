@@ -4,7 +4,7 @@ TEST_DIR ?= res://test
 WEB_PRESET ?= Web
 BUILD_DIR ?= build/web
 
-.PHONY: run import test lint export verify clean
+.PHONY: run import test lint export verify clean test-art capture-saci
 
 run:
 	$(GODOT) --path .
@@ -24,6 +24,11 @@ lint:
 test-art:
 	python3 tools/comfy/test_postprocess.py
 	python3 tools/comfy/generate.py --verify
+
+# Prints de evidencia do ticket 4: cada animacao do Saci desenhada pelo
+# sprite-render-adapter de producao, em docs/evidence/.
+capture-saci: import
+	$(GODOT) --path . tools/capture_saci.tscn -- res://docs/evidence
 
 # Export web single-threaded (preset "Web" usa a variante nothreads).
 export: import
