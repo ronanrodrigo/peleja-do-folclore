@@ -84,6 +84,25 @@ func test_input_capability_now_has_a_production_adapter() -> void:
 	)
 
 
+func test_render_capability_now_has_a_production_adapter() -> void:
+	assert_false(
+		_container.missing_production().has("render"),
+		"o sprite-render-adapter de producao existe desde o ticket 4"
+	)
+
+
+func test_render_capability_falls_back_to_sample_only_when_production_is_missing() -> void:
+	var reported_missing: bool = _container.missing_production().has("render")
+	var production_missing: bool = not ResourceLoader.exists(
+		CONTAINER.PRODUCTION_ADAPTERS["render"]
+	)
+	assert_eq(
+		reported_missing,
+		production_missing,
+		"render cai para sample se e somente se nao tem adapter de producao"
+	)
+
+
 func test_input_capability_falls_back_to_sample_only_when_production_is_missing() -> void:
 	var reported_missing: bool = _container.missing_production().has("input")
 	var production_missing: bool = not ResourceLoader.exists(
@@ -113,7 +132,9 @@ func test_live_mode_uses_the_production_adapter_where_it_exists() -> void:
 		)
 	assert_eq(live_container.origin("asset"), "live", "asset usa o adapter de producao")
 	assert_eq(live_container.origin("input"), "live", "input usa o teclado de producao")
+	assert_eq(live_container.origin("render"), "live", "render usa o sprite-render-adapter")
 	assert_true(live_container.asset_gateway() is AssetGateway, "gateway de asset injetado")
+	assert_true(live_container.render_gateway() is RenderGateway, "gateway de render injetado")
 	assert_true(
 		live_container.touch_input_gateway() is InputGateway,
 		"o toque tambem e instanciado pelo composition root"

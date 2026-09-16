@@ -13,6 +13,8 @@ extends AssetGateway
 
 const GENERATED_ROOT := "res://assets/generated"
 const PALETTE_ROOT := "res://assets/palettes"
+## Spritesheets codificados dos lutadores (dado versionado, ADR 0005).
+const SPRITESHEET_ROOT := "res://assets/spritesheets"
 const IMAGE_SUFFIX := ".png"
 const JSON_SUFFIX := ".json"
 
@@ -30,9 +32,10 @@ const FALLBACK_ACCENT := Color8(255, 211, 92)
 const FALLBACK_HORIZON_Y := 196
 
 
-## O identificador existe: paleta versionada ou arte gerada com este slug.
+## O identificador existe: spritesheet codificado, paleta versionada ou arte
+## gerada com este slug.
 func exists(id: String) -> bool:
-	return not load_palette(id).is_empty() or has_art(id)
+	return has_spritesheet(id) or not load_palette(id).is_empty() or has_art(id)
 
 
 ## Paleta de cores por identificador, lida de `assets/palettes/<id>.json`.
@@ -51,11 +54,29 @@ func load_palette(id: String) -> PackedColorArray:
 
 
 ## Spritesheet de lutador por slug: dado versionado (ADR 0005), nao arte gerada.
-## Este adapter devolve vazio de proposito -- quem carrega spritesheet e o ticket 4.
+## Lido de `assets/spritesheets/<slug>.json` e devolvido como dicionario; quem
+## valida e quem desenha e o dominio (`Spritesheet.decode`) e o render adapter.
+## Slug sem arquivo volta vazio, sem tocar na engine.
 func load_spritesheet(slug: String) -> Dictionary:
-	if slug.is_empty():
+	if not has_spritesheet(slug):
 		return {}
-	return {}
+	return _read_json(spritesheet_path(slug))
+
+
+## Caminho do JSON codificado de um lutador.
+func spritesheet_path(slug: String) -> String:
+	if slug.is_empty():
+		return ""
+	return "%s/%s%s" % [SPRITESHEET_ROOT, slug, JSON_SUFFIX]
+
+
+## Existe spritesheet codificado versionado para este slug. Vale tanto o arquivo
+## no disco (dev e build) quanto o recurso empacotado no export web.
+func has_spritesheet(slug: String) -> bool:
+	var path := spritesheet_path(slug)
+	if path.is_empty():
+		return false
+	return FileAccess.file_exists(path) or ResourceLoader.exists(path)
 
 
 ## Painel de tela cheia por slug: pixels RGBA8 da arte gerada, ou fallback.
@@ -132,6 +153,9 @@ func _rgba8_pixels(image: Image) -> PackedByteArray:
 func _read_json(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
+		# Sem arquivo no disco, o JSON ainda pode existir como recurso importado.
+		if not ResourceLoader.exists(path):
+			return {}
 		var resource: Variant = load(path)
 		if resource is JSON:
 			var data: Variant = (resource as JSON).data
