@@ -12,6 +12,7 @@ enum Command {
 	MOVE_LEFT,
 	MOVE_RIGHT,
 	CROUCH,
+	BLOCK,
 	JUMP,
 	LIGHT,
 	HEAVY,

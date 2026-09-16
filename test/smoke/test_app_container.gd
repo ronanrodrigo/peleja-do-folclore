@@ -77,6 +77,25 @@ func test_asset_capability_already_has_a_production_adapter() -> void:
 	)
 
 
+func test_input_capability_now_has_a_production_adapter() -> void:
+	assert_false(
+		_container.missing_production().has("input"),
+		"o teclado de producao existe desde o ticket 3"
+	)
+
+
+func test_input_capability_falls_back_to_sample_only_when_production_is_missing() -> void:
+	var reported_missing: bool = _container.missing_production().has("input")
+	var production_missing: bool = not ResourceLoader.exists(
+		CONTAINER.PRODUCTION_ADAPTERS["input"]
+	)
+	assert_eq(
+		reported_missing,
+		production_missing,
+		"input cai para sample se e somente se nao tem adapter de producao"
+	)
+
+
 func test_live_mode_uses_the_production_adapter_where_it_exists() -> void:
 	OS.set_environment("PELEJA_ADAPTERS", "live")
 	var live_container: Variant = load(CONTAINER_SCRIPT).new()
@@ -93,5 +112,10 @@ func test_live_mode_uses_the_production_adapter_where_it_exists() -> void:
 			"origem do adapter de %s segue a existencia do adapter de producao" % capability
 		)
 	assert_eq(live_container.origin("asset"), "live", "asset usa o adapter de producao")
+	assert_eq(live_container.origin("input"), "live", "input usa o teclado de producao")
 	assert_true(live_container.asset_gateway() is AssetGateway, "gateway de asset injetado")
+	assert_true(
+		live_container.touch_input_gateway() is InputGateway,
+		"o toque tambem e instanciado pelo composition root"
+	)
 	OS.set_environment("PELEJA_ADAPTERS", SAMPLE_ENV)

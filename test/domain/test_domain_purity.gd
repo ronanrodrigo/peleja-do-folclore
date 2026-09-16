@@ -20,6 +20,7 @@ const EXPECTED_FILES := [
 	"hidden_advantage.gd",
 	"match_rules.gd",
 	"move.gd",
+	"opponent_ai.gd",
 	"opponent_stats.gd",
 	"rng.gd",
 	"round_clock.gd",

@@ -173,3 +173,64 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   reproduzir o mesmo PNG depende do mesmo checkpoint e do mesmo backend (MPS).
 - Ate o ticket 7, o unico lugar do jogo que consome arte gerada e a tela de
   titulo; o resto segue no fallback em codigo.
+
+## Ticket 3 — Lutador jogavel e IA
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `src/domain/opponent_ai.gd`: politica pura da IA do Oponente, parametrizada
+  por tres niveis (`easy`/`normal`/`hard`) em `PROFILES` (agressao, defesa,
+  recuo, uso do Especial e distancia de engajamento, mais `reaction_ticks`) e
+  decisao deterministica pela semente injetada; `WAIT` nao consome o `Rng`.
+- `src/application/services/match-service.gd`: caso de uso de uma Peleja.
+  Orquestra os dois lutadores, o relogio em ticks, a melhor de tres e a IA:
+  drena os comandos do jogador do `input-gateway`, decide e executa a acao do
+  Oponente, avanca os lutadores, resolve os golpes e fecha o round/mata. Entrega
+  um `render_model()` (retangulos no espaco 426x240) como unica fonte visual e um
+  `snapshot()`. Nenhum estado em singleton.
+- `src/interface-adapters/keyboard-input-adapter.gd`: teclado (WASD/setas,
+  Shift defende, J/K/L leve/pesado/agarrao, U especial), com `poll()`/`clear()`
+  e teclas de repeticao para movimento/defesa.
+- `src/interface-adapters/touch-input-adapter.gd`: botoes na tela produzindo os
+  mesmos comandos do teclado; `mount()` monta os botoes e alimenta a mesma fila.
+- `src/application/gateways/input-gateway.gd`: `Command` ganha `BLOCK` (a defesa
+  e um comando de primeira classe, como o agachar).
+- `autoloads/app_container.gd`: continua o unico lugar que instancia adapter
+  concreto; passa a instanciar o adapter de toque junto do de teclado e o expoe
+  por `touch_input_gateway()` (a cena escolhe teclado ou toque, sem instanciar).
+- `scenes/fight.tscn` + `scenes/fight.gd`: cena fina -- monta o `FightDisplay`,
+  delega ao `MatchService`, conecta o sinal `match_finished` e pinta os
+  retangulos do `render_model()` num `Image` 426x240 com filtro nearest.
+- `tools/capture_fight.gd` + `.tscn`: ferramenta de evidencia fora das camadas do
+  jogo; joga a Peleja com o `input-gateway` `sample` (sem teclado sintetico) e
+  grava os prints.
+- `test/domain/test_opponent_ai.gd`, `test/application/test_match_service.gd`,
+  `test/smoke/test_fight_screen.gd` e ajustes em `test/smoke/test_app_container.gd`.
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT
+  headless `197/197` testes e `2057` asserts com `-gexit` (eram 171 testes no
+  ticket 9: esta fatia acrescenta 26); export web gerou `index.html`, `index.js`,
+  `index.pck` e `index.wasm` (`39514754` bytes, a variante single-threaded).
+- IA deterministica por semente e coberta por teste (`mesma semente -> mesmas
+  decisoes`) e o `match-service` reproduz a Peleja inteira com comandos iguais.
+- Print de uma Peleja completa em `docs/evidence/ticket-03-fight-*.png`
+  (`round1`, `round2`, `result`, 426x240): o Guardiao vence 2-0 (`rounds [0,0]`),
+  Peleja encerrada em 6823 ticks de simulacao, com os corpos no chao, as duas
+  barras de vida, as barras de Especial e os pips de round.
+
+**Dividas assumidas nesta fatia**
+
+- Os lutadores sao retangulos placeholder pintados a partir do `render_model()`:
+  o `sprite-render-adapter` de producao e os spritesheets codificados chegam no
+  ticket 4; ate la a `render-gateway` de producao ainda nao existe (o modo `live`
+  cai para `sample` em `render`, `audio` e `persistence`).
+- O Golpe Especial usa a moldura comum (`Move.special`); o efeito proprio de cada
+  Guardiao e a tabela de especiais entram no ticket 5.
+- A IA tem tres niveis com uma unica escada de dificuldade; a variacao por
+  Arquetipo (ataques que roubam barra, perfis distintos) entra no ticket 6.
+- A cena de luta roda sozinha (`godot --path . scenes/fight.tscn`); a navegacao
+  titulo -> luta e o retorno de vitoria/derrota entram no polimento (ticket 10).
