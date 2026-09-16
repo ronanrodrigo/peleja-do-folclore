@@ -505,6 +505,8 @@ func snapshot() -> Dictionary:
 		"winner": winner(),
 		"guardian_health_ratio": guardian.health.ratio() if guardian != null else 0.0,
 		"opponent_health_ratio": opponent.health.ratio() if opponent != null else 0.0,
+		"guardian_meter_ratio": guardian.meter.ratio() if guardian != null else 0.0,
+		"opponent_meter_ratio": opponent.meter.ratio() if opponent != null else 0.0,
 		"guardian_x": guardian.position.x if guardian != null else 0,
 		"opponent_x": opponent.position.x if opponent != null else 0,
 		"clock_seconds": clock.remaining_seconds() if clock != null else 0,

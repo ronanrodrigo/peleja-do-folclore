@@ -55,12 +55,46 @@ const FORBIDDEN_KEYS := [
 	"hidden_advantage",
 ]
 
+## --- HUD de luta (426x240) ---
+##
+## Topo da tela = informacao: nome, vida, barra de especial, pips de round e
+## relogio. A faixa superior e reservada (o layout de toque nunca monta botao
+## aqui). A vida entra so como PROPORCAO de barra; nenhum numero de vida, dano ou
+## Vantagem Oculta existe neste modelo (ADR 0003).
+const FIGHT_BAR_WIDTH := 180
+const FIGHT_BAR_HEIGHT := 6
+const FIGHT_METER_HEIGHT := 4
+const FIGHT_PIP_SIZE := 5
+const FIGHT_PIP_GAP := 2
+const FIGHT_MARGIN := 8
+const FIGHT_NAME_Y := 8
+const FIGHT_CLOCK_Y := 6
+const FIGHT_BAR_Y := 20
+const FIGHT_METER_Y := 30
+const FIGHT_PIP_Y := 38
+const FIGHT_NAME_SCALE := 1
+const FIGHT_CLOCK_SCALE := 1
+const FIGHT_LABEL_SCALE := 1
+const FIGHT_ARCADE_Y := 48
+const COLOR_BAR_BACK := Color8(42, 42, 64)
+const COLOR_HEALTH_FILL := Color8(120, 220, 120)
+const COLOR_METER_FILL := Color8(90, 150, 255)
+const COLOR_PIP_LOST := Color8(60, 60, 84)
+const COLOR_NAME_TEXT := Color8(240, 240, 255)
+const COLOR_CLOCK_TEXT := Color8(255, 211, 92)
+const COLOR_PROGRESS_TEXT := Color8(200, 200, 230)
 
-## Rotulos pt-BR dos status de Golpe Especial: o dominio conhece o nome em
-## ingles, a copy vive aqui, na borda de apresentacao.
+## Status ativos dos dois lutadores como copy pt-BR no modelo (`statuses`).
 const STATUS_LABELS := {
 	"sleep": "SONO",
 	"invert_controls": "COMANDOS INVERTIDOS",
+}
+
+## Nivel de IA (`OpponentAi.difficulty_name`) para a copy pt-BR do HUD do arcade.
+const DIFFICULTY_LABELS := {
+	"easy": "FÁCIL",
+	"normal": "MÉDIO",
+	"hard": "DIFÍCIL",
 }
 
 
@@ -130,10 +164,16 @@ func fight_model(
 	var opponent_rounds := int(state.get("opponent_rounds", 0))
 	return {
 		"left": _side_model(
-			guardian_name, float(state.get("guardian_health_ratio", 0.0)), guardian_rounds
+			guardian_name,
+			float(state.get("guardian_health_ratio", 0.0)),
+			float(state.get("guardian_meter_ratio", 0.0)),
+			guardian_rounds
 		),
 		"right": _side_model(
-			opponent_name, float(state.get("opponent_health_ratio", 0.0)), opponent_rounds
+			opponent_name,
+			float(state.get("opponent_health_ratio", 0.0)),
+			float(state.get("opponent_meter_ratio", 0.0)),
+			opponent_rounds
 		),
 		"round": int(state.get("round", 0)),
 		"rounds_to_win": MatchRules.ROUNDS_TO_WIN,
@@ -144,16 +184,122 @@ func fight_model(
 	}
 
 
+## Modelo do HUD de arcade: em que Peleja o jogador esta, contra quem, com que
+## dificuldade e quanto falta. Dado de apresentacao, sem numero de Vantagem Oculta.
+func arcade_model(state: Dictionary) -> Dictionary:
+	var fight_number := maxi(int(state.get("fight", 0)), 0)
+	var fight_count := maxi(int(state.get("fights", 0)), 0)
+	var difficulty := str(state.get("difficulty", ""))
+	var signature := str(state.get("opponent_signature", ""))
+	return {
+		"fight_text": "PELEJA %d/%d" % [fight_number, fight_count],
+		"opponent_text": str(state.get("opponent_name", "")),
+		"signature_text": ("GOLPE: " + signature) if not signature.is_empty() else "",
+		"difficulty_text": str(DIFFICULTY_LABELS.get(difficulty, difficulty.to_upper())),
+		"progress": (float(fight_number) / float(fight_count)) if fight_count > 0 else 0.0,
+		"complete": bool(state.get("complete", false)),
+	}
+
+
+## Retangulos do HUD de luta, ja posicionados na resolucao base: fundo e
+## preenchimento das duas barras de vida, das duas barras de Especial e os pips
+## de round. A cena so pinta o que vem daqui -- nenhum calculo de layout na cena.
+func fight_hud_entries(model: Dictionary) -> Array:
+	var left_x := FIGHT_MARGIN
+	var right_x := BASE_SIZE.x - FIGHT_MARGIN - FIGHT_BAR_WIDTH
+	var entries: Array = []
+	entries.append_array(_side_bars(left_x, model["left"], false))
+	entries.append_array(_side_bars(right_x, model["right"], true))
+	entries.append_array(_pip_entries(left_x, int(model["left"]["rounds_won"]), false, model))
+	entries.append_array(_pip_entries(right_x, int(model["right"]["rounds_won"]), true, model))
+	return entries
+
+
+## Vida e Especial de um lado: fundo, preenchimento de vida e do Especial, na
+## mesma coluna do HUD.
+func _side_bars(x: int, side: Dictionary, right_aligned: bool) -> Array:
+	var height := FIGHT_BAR_HEIGHT
+	var meter_height := FIGHT_METER_HEIGHT
+	var health := _fill(x, FIGHT_BAR_Y, float(side["bar"]), height, right_aligned)
+	var meter := _fill(x, FIGHT_METER_Y, float(side["meter"]), meter_height, right_aligned)
+	return [_entry(Rect2i(x, FIGHT_BAR_Y, FIGHT_BAR_WIDTH, height), COLOR_BAR_BACK), health, meter]
+
+
+## Rotulos do HUD de luta: nome do Guardiao (esquerda), nome do Oponente
+## (direita), relogio do round (centro) e a linha do arcade. Texto e posicao --
+## a cena so desenha pela fonte bitmap.
+func fight_hud_labels(model: Dictionary) -> Array:
+	var labels: Array = []
+	var left_name := str(model["left"]["name"])
+	var right_name := str(model["right"]["name"])
+	var clock := str(model["clock_text"])
+	labels.append({
+		"text": left_name,
+		"position": Vector2i(FIGHT_MARGIN, FIGHT_NAME_Y),
+		"scale": FIGHT_NAME_SCALE,
+		"color": COLOR_NAME_TEXT,
+	})
+	labels.append({
+		"text": right_name,
+		"position": Vector2i(
+			BASE_SIZE.x - FIGHT_MARGIN - BitmapFont.text_width(right_name) * FIGHT_NAME_SCALE,
+			FIGHT_NAME_Y
+		),
+		"scale": FIGHT_NAME_SCALE,
+		"color": COLOR_NAME_TEXT,
+	})
+	labels.append({
+		"text": clock,
+		"position": _centered(clock, FIGHT_CLOCK_SCALE, 0, BASE_SIZE.x, FIGHT_CLOCK_Y),
+		"scale": FIGHT_CLOCK_SCALE,
+		"color": COLOR_CLOCK_TEXT,
+	})
+	var arcade_text := str(model.get("arcade_text", ""))
+	if not arcade_text.is_empty():
+		labels.append({
+			"text": arcade_text,
+			"position": _centered(arcade_text, FIGHT_LABEL_SCALE, 0, BASE_SIZE.x, FIGHT_ARCADE_Y),
+			"scale": FIGHT_LABEL_SCALE,
+			"color": COLOR_PROGRESS_TEXT,
+		})
+	return labels
+
+
+func _fill(x: int, y: int, ratio: float, height: int, right_aligned: bool) -> Dictionary:
+	var filled := roundi(FIGHT_BAR_WIDTH * clampf(ratio, 0.0, 1.0))
+	var left := x + FIGHT_BAR_WIDTH - filled if right_aligned else x
+	var color := COLOR_METER_FILL if height == FIGHT_METER_HEIGHT else COLOR_HEALTH_FILL
+	return _entry(Rect2i(left, y, filled, height), color)
+
+
+func _pip_entries(x: int, won: int, right_aligned: bool, model: Dictionary) -> Array:
+	var entries: Array = []
+	var total := int(model.get("rounds_to_win", MatchRules.ROUNDS_TO_WIN))
+	for index in total:
+		var offset := index * (FIGHT_PIP_SIZE + FIGHT_PIP_GAP)
+		var pip_x := x + FIGHT_BAR_WIDTH - FIGHT_PIP_SIZE - offset if right_aligned else x + offset
+		var color := COLOR_HEALTH_FILL if index < won else COLOR_PIP_LOST
+		entries.append(_entry(Rect2i(pip_x, FIGHT_PIP_Y, FIGHT_PIP_SIZE, FIGHT_PIP_SIZE), color))
+	return entries
+
+
+func _entry(rect: Rect2i, color: Color) -> Dictionary:
+	return {"rect": rect, "color": color}
+
+
 ## Texto do relogio do round (minutos e segundos), desenhado pela fonte bitmap.
 static func clock_text(seconds: int) -> String:
 	var remaining := maxi(seconds, 0)
 	return "%d:%02d" % [remaining / 60, remaining % 60]
 
 
-func _side_model(name_text: String, bar: float, rounds_won: int) -> Dictionary:
+func _side_model(
+	name_text: String, bar: float, meter: float, rounds_won: int
+) -> Dictionary:
 	return {
 		"name": name_text,
 		"bar": clampf(bar, 0.0, 1.0),
+		"meter": clampf(meter, 0.0, 1.0),
 		"rounds_won": rounds_won,
 		"rounds_left": maxi(MatchRules.ROUNDS_TO_WIN - rounds_won, 0),
 	}
