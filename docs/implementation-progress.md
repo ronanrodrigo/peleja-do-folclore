@@ -662,7 +662,7 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
 - `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT headless
   `430/430` testes e `234157` asserts com `-gexit` (eram 388 testes e 233726 asserts
   em `474244c`: esta fatia acrescenta 42 testes); export web gerou `index.html`,
-  `index.js`, `index.pck` (`859164` bytes) e `index.wasm` (`39514754` bytes, a
+  `index.js`, `index.pck` (`871096` bytes) e `index.wasm` (`39514754` bytes, a
   variante single-threaded de sempre).
 - `make capture-reviravolta` sai com codigo 0 e grava 6 prints 426x240 em
   `docs/evidence/ticket-07-reviravolta-{voice,wind,root,dissolve,skipped,end}.png`.
