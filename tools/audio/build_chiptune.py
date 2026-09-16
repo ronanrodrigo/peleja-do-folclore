@@ -564,14 +564,23 @@ TRACKS = {
 
 
 def synthesize() -> dict[str, tuple[bytes, int, Path]]:
-    """Todos os artefatos: nome -> (bytes PCM, taxa, caminho relativo)."""
+    """Todos os artefatos: chave -> (bytes PCM, taxa, caminho relativo).
+
+    A chave leva o diretorio porque SFX e musica podem ter o mesmo nome (o
+    contexto `select` e o efeito `select`, por exemplo) -- sem o prefixo um
+    sobrescreveria o outro.
+    """
     artifacts: dict[str, tuple[bytes, int, Path]] = {}
     for name, builder in sorted(SFX_BUILDERS.items()):
         buffer = builder(SFX_RATE)
-        artifacts[name] = (to_pcm_bytes(buffer), SFX_RATE, SFX_DIRECTORY / f"{name}.wav")
+        artifacts[f"sfx/{name}"] = (to_pcm_bytes(buffer), SFX_RATE, SFX_DIRECTORY / f"{name}.wav")
     for name, track in sorted(TRACKS.items()):
         buffer = render_track(track)
-        artifacts[name] = (to_pcm_bytes(buffer), MUSIC_RATE, MUSIC_DIRECTORY / f"{name}.wav")
+        artifacts[f"music/{name}"] = (
+            to_pcm_bytes(buffer),
+            MUSIC_RATE,
+            MUSIC_DIRECTORY / f"{name}.wav",
+        )
     return artifacts
 
 

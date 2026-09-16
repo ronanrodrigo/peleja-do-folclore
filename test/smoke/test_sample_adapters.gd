@@ -75,6 +75,31 @@ func test_sample_audio_gateway_never_touches_audio_server() -> void:
 	assert_eq(gateway.master_volume, 0.25)
 
 
+func test_sample_audio_gateway_covers_the_contract_and_the_player_gesture() -> void:
+	var gateway := SilentAudioGateway.new()
+	assert_false(gateway.is_audio_unlocked(), "o audio comeca travado (autoplay do navegador)")
+	assert_eq(gateway.last_music(), "", "nenhum contexto musical pedido ainda")
+	for kind in AudioGateway.SFX_KINDS:
+		gateway.play_sfx(kind)
+	assert_eq(
+		gateway.sfx_calls.size(),
+		AudioGateway.SFX_KINDS.size(),
+		"o adapter sample aceita todos os efeitos do contrato"
+	)
+	for context in AudioGateway.MUSIC_CONTEXTS:
+		gateway.play_music(context)
+	assert_eq(
+		gateway.last_music(),
+		AudioGateway.MUSIC_CONTEXTS[-1],
+		"o adapter sample aceita todos os contextos do contrato"
+	)
+	gateway.notify_user_gesture()
+	assert_true(gateway.is_audio_unlocked(), "o gesto do jogador e registrado")
+	assert_eq(gateway.gesture_count, 1, "um gesto, uma contagem")
+	gateway.set_mute(true)
+	assert_true(gateway.muted, "o mudo fica registrado em memoria")
+
+
 func test_sample_asset_gateway_serves_seeded_content_and_fallback() -> void:
 	var gateway := InMemoryAssetGateway.new()
 	assert_true(gateway.exists("placeholder"), "paleta placeholder pre-carregada")

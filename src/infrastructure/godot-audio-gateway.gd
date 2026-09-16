@@ -82,6 +82,15 @@ func is_mounted() -> bool:
 	return _host != null and is_instance_valid(_host)
 
 
+## Vozes de SFX e quantas estao com stream carregado (teste e diagnostico).
+func voice_state() -> Dictionary:
+	var loaded := 0
+	for player in _sfx_players:
+		if player.stream != null:
+			loaded += 1
+	return {"voices": _sfx_players.size(), "loaded": loaded}
+
+
 func play_sfx(kind: String) -> void:
 	if not SFX_FILES.has(kind):
 		# Capacidade desconhecida nao vira som: o contrato e a lista fechada.
@@ -158,21 +167,7 @@ func music_path(context: String) -> String:
 	return "%s/%s/%s.wav" % [AUDIO_ROOT, MUSIC_DIRECTORY, MUSIC_FILES[context]]
 
 
-## Capacidades de SFX que o adapter sabe tocar (observavel por teste).
-func known_sfx() -> Array:
-	var kinds: Array = SFX_FILES.keys()
-	kinds.sort()
-	return kinds
-
-
-## Contextos musicais que o adapter sabe tocar (observavel por teste).
-func known_music() -> Array:
-	var contexts: Array = MUSIC_FILES.keys()
-	contexts.sort()
-	return contexts
-
-
-## Intencoes de SFX recebidas, na ordem -- inclusive as que nao tocaram.
+## Capacidades de SFX recebidas, na ordem -- inclusive as que nao tocaram.
 func sfx_played() -> Array:
 	return _sfx_played.duplicate()
 
@@ -200,20 +195,15 @@ func is_muted() -> bool:
 	return _muted
 
 
-## Volume efetivo do barramento `Master`, em decibeis (observavel por teste).
-func bus_volume_db() -> float:
+## Volume efetivo e mudo efetivo do barramento `Master` (observavel por teste).
+func bus_state() -> Dictionary:
 	var index := AudioServer.get_bus_index(MASTER_BUS)
 	if index < 0:
-		return 0.0
-	return AudioServer.get_bus_volume_db(index)
-
-
-## Mudo efetivo do barramento `Master`.
-func bus_muted() -> bool:
-	var index := AudioServer.get_bus_index(MASTER_BUS)
-	if index < 0:
-		return false
-	return AudioServer.is_bus_mute(index)
+		return {"volume_db": 0.0, "muted": false}
+	return {
+		"volume_db": AudioServer.get_bus_volume_db(index),
+		"muted": AudioServer.is_bus_mute(index),
+	}
 
 
 func _can_play() -> bool:
