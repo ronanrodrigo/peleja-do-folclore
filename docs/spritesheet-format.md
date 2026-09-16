@@ -121,6 +121,22 @@ O Redemoinho não é só desenho: o efeito de puxão vive no domínio
 janela ativa do golpe, e o Golpe Especial consome a Barra de Especial inteira e
 só dispara com a barra cheia (`Fighter.start_special`).
 
+## O resto do elenco (ticket 5)
+
+Os outros três Guardiões reusam exatamente o mesmo formato e o mesmo esquema de
+quadros da tabela acima (corpo 24x34, agachado 26x20, pesado 32x34, especial
+40x40, nocaute 34x20), com dez animações e três quadros no `special`:
+
+| Slug | Guardião | Golpe Especial | O que a arte e o efeito mostram |
+| --- | --- | --- | --- |
+| `curupira` | Curupira | **Pés Invertidos** | cabelo de fogo e pés virados (calcanhar na frente); o quadro do especial traz as pegadas correndo ao contrário |
+| `iara` | Iara | **Canto do Rio** | cabelo de rio, concha e cauda de escamas; o especial traz as ondas, as notas e o abraço d'água |
+| `cuca` | Cuca | **Nana Neném** | focinho de jacaré com dentes e cabelo de fogo; o especial traz o jacaré inteiro mordendo |
+
+O efeito de cada um é dado na `SpecialMoveTable` (aplicado na janela ativa do
+golpe): `invert_ticks` e `knockback_pixels` nos Pés Invertidos, `sleep_ticks` e
+`drain_per_tick` no Canto do Rio, `sleep_ticks` e `bite_per_tick` no Nana Neném.
+
 ## Como (re)gerar
 
 A arte é autoral e determinística: `tools/art/build_saci_spritesheet.py` desenha

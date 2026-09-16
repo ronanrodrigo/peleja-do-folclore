@@ -17,6 +17,17 @@ const SACI := "Saci"
 const CURUPIRA := "Curupira"
 const IARA := "Iara"
 const CUCA := "Cuca"
+## Elenco completo dos 4 Guardioes jogaveis, na ordem da tela de selecao. E dado,
+## nunca codigo espalhado: a selecao, o HUD e a ferramenta de evidencia leem daqui.
+const ROSTER := [SACI, CURUPIRA, IARA, CUCA]
+
+## Identificador em ingles de cada Guardiao (nome de arquivo da spritesheet).
+const SLUGS := {
+	SACI: "saci",
+	CURUPIRA: "curupira",
+	IARA: "iara",
+	CUCA: "cuca",
+}
 
 
 func _init(p_display_name: String = SACI) -> void:
@@ -38,3 +49,38 @@ static func for_guardian(p_display_name: String) -> GuardianStats:
 ## Guardiao com a Vantagem Oculta ja aplicada: e este que entra na Peleja.
 static func advantaged(p_display_name: String) -> FighterStats:
 	return HiddenAdvantage.apply(GuardianStats.new(p_display_name))
+
+
+## Os 4 Guardioes, na ordem do elenco (copia da lista, para o chamador nao
+## mexer no dado do dominio).
+static func all() -> Array:
+	return ROSTER.duplicate()
+
+
+static func is_guardian(p_display_name: String) -> bool:
+	return ROSTER.has(p_display_name)
+
+
+static func count() -> int:
+	return ROSTER.size()
+
+
+## Slug em ingles do Guardiao, ou vazio quando o nome nao e do elenco.
+static func slug_for(p_display_name: String) -> String:
+	return str(SLUGS.get(p_display_name, ""))
+
+
+## Nome de exibicao do Guardiao a partir do slug, ou vazio quando o slug nao e
+## de nenhum Guardiao do elenco.
+static func display_name_for_slug(slug: String) -> String:
+	for guardian_name in ROSTER:
+		if SLUGS.get(guardian_name, "") == slug:
+			return guardian_name
+	return ""
+
+
+static func slugs() -> PackedStringArray:
+	var names := PackedStringArray()
+	for guardian_name in ROSTER:
+		names.append(slug_for(guardian_name))
+	return names

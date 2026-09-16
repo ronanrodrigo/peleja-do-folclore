@@ -67,6 +67,8 @@ var special_move: Move
 var opponent_special_move: Move
 ## Efeito proprio do Golpe Especial do Guardiao (o Redemoinho do Saci puxa).
 var special_effect: SpecialMove
+## Relatorio do ultimo tick de efeito do Especial (puxao, drenagem, status).
+var special_report: Dictionary = {}
 var phase: int = Phase.IDLE
 var last_round_result: int = MatchRules.RoundResult.UNRESOLVED
 
@@ -171,23 +173,43 @@ func _simulate_round_tick() -> void:
 	guardian.advance_tick()
 	opponent.advance_tick()
 	_resolve_combat()
-	_apply_special_pull()
+	_apply_special_effect()
 	clock.advance(1)
 	_face_each_other()
 	_resolve_round_end()
 
 
 ## Efeito proprio do Golpe Especial do Guardiao: enquanto a janela ativa do
-## Redemoinho dura, o turbilhao suga o Oponente para dentro dele. O puxao e regra
-## pura do dominio (`SpecialMove`), nao desenho.
-func _apply_special_pull() -> void:
+## Redemoinho dura, o turbilhao suga o Oponente para dentro dele. Cada lenda
+## aplica o proprio efeito no mesmo ponto do tick -- Pes Invertidos troca o lado
+## dos comandos do Oponente, Canto do Rio adormece e drena, Nana Nenem adormece
+## e morde. O efeito e regra pura do dominio (`SpecialMove`), nao desenho.
+func _apply_special_effect() -> void:
 	if special_effect == null or guardian == null or opponent == null:
 		return
 	if guardian.current_move == null or not guardian.current_move.is_special():
 		return
 	if not guardian.is_move_active():
 		return
-	special_effect.pull_target(guardian, opponent)
+	special_report = special_effect.apply_active_tick(guardian, opponent)
+
+
+## Retrato dos status ativos de um lutador (nome em ingles + ticks restantes).
+## A HUD so mostra que ha status; os numeros da Vantagem Oculta nunca entram aqui.
+func _status_report(fighter: Fighter) -> Array:
+	var report: Array = []
+	if fighter == null or fighter.statuses == null:
+		return report
+	for status in fighter.statuses.active:
+		if not status.is_active():
+			continue
+		report.append(
+			{
+				"name": StatusEffect.name_of(status.kind),
+				"ticks": status.ticks_remaining,
+			}
+		)
+	return report
 
 
 ## Executa ate o primeiro comando que muda alguma coisa; depois solta o que ficou
@@ -299,6 +321,7 @@ func _resolve_round_end() -> void:
 func _begin_round() -> void:
 	guardian.reset_for_round(GUARDIAN_SPAWN_X)
 	opponent.reset_for_round(OPPONENT_SPAWN_X)
+	special_report = {}
 	clock.reset()
 	_face_each_other()
 	_round_pause_ticks = 0
@@ -417,6 +440,9 @@ func snapshot() -> Dictionary:
 		"clock_seconds": clock.remaining_seconds() if clock != null else 0,
 		"special_active": _is_special_active(),
 		"special_name": special_effect.display_name if special_effect != null else "",
+		"special_report": special_report,
+		"guardian_status": _status_report(guardian),
+		"opponent_status": _status_report(opponent),
 	}
 
 
