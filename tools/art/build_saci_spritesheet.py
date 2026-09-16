@@ -18,8 +18,17 @@ import argparse
 import json
 import pathlib
 
-TRANSPARENT = "."
-ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
+from pixel_grid import (
+    ALPHABET,
+    Grid,
+    TRANSPARENT,
+    bind_palette,
+    build_spritesheet as build_data,
+    outline,
+    parse_hex,
+    render_preview,
+    write_spritesheet,
+)
 
 # Paleta do Saci, indexada pela ordem abaixo (o indice 0 e o transparente).
 PALETTE = [
@@ -67,64 +76,6 @@ CHAR_INDEX = {
 }
 assert CHAR_INDEX[OUT] == 1 and CHAR_INDEX[EYE] == 11 and len(CHAR_INDEX) == len(PALETTE)
 
-
-class Grid:
-    """Matriz de caracteres: cada caractere e um indice da paleta."""
-
-    def __init__(self, width: int, height: int, fill: str = TRANSPARENT) -> None:
-        self.width = width
-        self.height = height
-        self.rows = [[fill] * width for _ in range(height)]
-
-    def pixel(self, x: int, y: int, char: str) -> None:
-        if 0 <= x < self.width and 0 <= y < self.height:
-            self.rows[y][x] = char
-
-    def rect(self, x: int, y: int, width: int, height: int, char: str) -> None:
-        for row in range(y, y + height):
-            for column in range(x, x + width):
-                self.pixel(column, row, char)
-
-    def line(self, x0: int, x1: int, y: int, char: str) -> None:
-        for column in range(min(x0, x1), max(x0, x1) + 1):
-            self.pixel(column, y, char)
-
-    def column(self, x: int, y0: int, y1: int, char: str) -> None:
-        for row in range(min(y0, y1), max(y0, y1) + 1):
-            self.pixel(x, row, char)
-
-    def paste(self, other: "Grid", x: int, y: int) -> None:
-        for row in range(other.height):
-            for column in range(other.width):
-                char = other.rows[row][column]
-                if char != TRANSPARENT:
-                    self.pixel(x + column, y + row, char)
-
-    def to_text(self) -> list[str]:
-        return ["".join(row) for row in self.rows]
-
-    def dump(self) -> str:
-        return "\n".join(self.to_text())
-
-
-def outline(grid: Grid) -> None:
-    """Contorno por silhueta: so os pixels vazios que encostam no corpo.
-
-    Desenhar cada membro com contorno proprio transforma o lutador num bloco
-    escuro; contornar a silhueta inteira mantem a leitura de braco, perna e
-    cachimbo separados.
-    """
-    body = [row[:] for row in grid.rows]
-    for y in range(grid.height):
-        for x in range(grid.width):
-            if body[y][x] != TRANSPARENT:
-                continue
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < grid.width and 0 <= ny < grid.height:
-                    if body[ny][nx] != TRANSPARENT and body[ny][nx] != OUT:
-                        grid.pixel(x, y, OUT)
-                        break
 
 
 def draw_cap(grid: Grid, center_x: int, top: int, scale: int = 1) -> int:
@@ -448,89 +399,11 @@ def build_animations() -> dict[str, list[Grid]]:
     }
 
 
-def encode_rows(grid: Grid) -> list[str]:
-    encoded = []
-    for row in grid.to_text():
-        encoded.append(
-            "".join(
-                TRANSPARENT if char == TRANSPARENT else ALPHABET[CHAR_INDEX[char]]
-                for char in row
-            )
-        )
-    return encoded
-
 
 def build_spritesheet() -> dict:
-    animations = {}
-    for name, frames in build_animations().items():
-        for frame in frames:
-            for row in frame.to_text():
-                assert len(row) == frame.width, f"{name}: linha com largura errada"
-        animations[name] = [
-            {"width": frame.width, "height": frame.height, "pixels": encode_rows(frame)}
-            for frame in frames
-        ]
-    return {
-        "slug": "saci",
-        "version": 1,
-        "palette": PALETTE,
-        "animations": animations,
-    }
-
-
-def decode_frame(data: dict, frame: dict):
-    from PIL import Image
-
-    palette = [parse_hex(color) for color in data["palette"]]
-    image = Image.new("RGBA", (frame["width"], frame["height"]), (0, 0, 0, 0))
-    pixels = image.load()
-    for y, row in enumerate(frame["pixels"]):
-        for x, char in enumerate(row):
-            index = 0 if char == TRANSPARENT else ALPHABET.index(char)
-            pixels[x, y] = palette[index]
-    return image
-
-
-def render_preview(data: dict, path: pathlib.Path, scale: int = 3) -> None:
-    from PIL import Image, ImageDraw
-
-    animations = data["animations"]
-    columns = max(len(frames) for frames in animations.values())
-    cell_width = max(frame["width"] for frames in animations.values() for frame in frames)
-    cell_height = max(frame["height"] for frames in animations.values() for frame in frames)
-    padding = 4
-    label_height = 10
-    sheet = Image.new(
-        "RGBA",
-        (
-            (cell_width + padding) * columns + padding,
-            (cell_height + padding + label_height) * len(animations) + padding,
-        ),
-        (18, 18, 42, 255),
-    )
-    draw = ImageDraw.Draw(sheet)
-    for row_index, (name, frames) in enumerate(animations.items()):
-        y = padding + row_index * (cell_height + padding + label_height) + label_height
-        for column, frame in enumerate(frames):
-            image = decode_frame(data, frame)
-            x = padding + column * (cell_width + padding)
-            sheet.paste(image, (x, y), image)
-        draw.text((padding, y - label_height + 1), name, fill=(255, 211, 92, 255))
-    sheet = sheet.resize((sheet.width * scale, sheet.height * scale), Image.NEAREST)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    sheet.save(path)
-    print(f"preview: {path} ({sheet.width}x{sheet.height})")
-
-
-def parse_hex(value: str) -> tuple[int, int, int, int]:
-    value = value.lstrip("#")
-    return (
-        int(value[0:2], 16),
-        int(value[2:4], 16),
-        int(value[4:6], 16),
-        int(value[6:8], 16),
-    )
-
+    """Dicionario do formato do Saci, a partir das matrizes desenhadas."""
+    bind_palette(CHAR_INDEX)
+    return build_data("saci", PALETTE, build_animations())
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -545,13 +418,7 @@ def main() -> int:
 
     data = build_spritesheet()
     output = pathlib.Path(arguments.output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    frames = sum(len(items) for items in data["animations"].values())
-    print(
-        f"spritesheet: {output} -- {len(data['animations'])} animacoes, "
-        f"{frames} frames, paleta de {len(data['palette'])} cores"
-    )
+    write_spritesheet(data, output)
     if arguments.preview:
         render_preview(data, pathlib.Path(arguments.preview))
     if arguments.dump:
