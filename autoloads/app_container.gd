@@ -9,8 +9,9 @@ extends Node
 ##
 ## Enquanto uma capacidade nao tem adapter de producao, o modo `live` cai para o
 ## adapter `sample` correspondente e registra isso em `missing_production()`.
-## Assim o esqueleto roda antes dos tickets 3, 4, 8 e 9 e passa a usar producao
-## sozinho quando os adapters reais aparecerem no caminho declarado.
+## Assim o esqueleto roda antes de cada ticket e passa a usar producao sozinho
+## quando o adapter real aparece no caminho declarado (foi o caso de input,
+## render, asset, audio e persistencia).
 
 const MODE_SAMPLE := "sample"
 const MODE_LIVE := "live"
@@ -78,7 +79,18 @@ func wire() -> void:
 			SAMPLE_ADAPTERS[capability] if origin == MODE_SAMPLE else PRODUCTION_ADAPTERS[capability]
 		)
 		_gateways[capability] = (load(script_path) as GDScript).new()
+	_wire_audio_output()
 	_wire_touch()
+
+
+## O adapter de audio de producao precisa de um no hospedeiro para os players, e
+## quem sobrevive a troca de cena e este autoload -- a musica atravessa as cenas.
+## O adapter `sample` (silencioso) nao tem `mount`: nada e montado em teste.
+func _wire_audio_output() -> void:
+	var adapter: Variant = _gateways.get(CAPABILITY_AUDIO)
+	if adapter == null or not adapter.has_method("mount"):
+		return
+	adapter.mount(self)
 
 
 ## O adapter de toque so existe quando a entrada esta em producao e o arquivo ja
