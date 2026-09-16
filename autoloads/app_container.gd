@@ -42,6 +42,12 @@ const SAMPLE_ADAPTERS := {
 	CAPABILITY_PERSISTENCE: "res://src/infrastructure/sample/in-memory-persistence-gateway.gd",
 }
 
+## A capacidade de entrada tem dois adapters de producao (teclado e toque). O
+## caminho acima e o do teclado; o de toque e instanciado junto e exposto por
+## `touch_input_gateway()`. Continua sendo o composition root o unico lugar que
+## instancia adapter concreto.
+const PRODUCTION_TOUCH_ADAPTER := "res://src/interface-adapters/touch-input-adapter.gd"
+
 const _ALL_CAPABILITIES := [
 	CAPABILITY_INPUT,
 	CAPABILITY_RENDER,
@@ -53,6 +59,7 @@ const _ALL_CAPABILITIES := [
 var _mode: String = MODE_LIVE
 var _gateways: Dictionary = {}
 var _origins: Dictionary = {}
+var _touch_gateway: InputGateway = null
 
 
 func _enter_tree() -> void:
@@ -71,6 +78,18 @@ func wire() -> void:
 			SAMPLE_ADAPTERS[capability] if origin == MODE_SAMPLE else PRODUCTION_ADAPTERS[capability]
 		)
 		_gateways[capability] = (load(script_path) as GDScript).new()
+	_wire_touch()
+
+
+## O adapter de toque so existe quando a entrada esta em producao e o arquivo ja
+## foi implementado; em modo `sample` a cena usa o input-gateway injetado.
+func _wire_touch() -> void:
+	_touch_gateway = null
+	if _origins.get(CAPABILITY_INPUT) != MODE_LIVE:
+		return
+	if not ResourceLoader.exists(PRODUCTION_TOUCH_ADAPTER):
+		return
+	_touch_gateway = (load(PRODUCTION_TOUCH_ADAPTER) as GDScript).new()
 
 
 func mode() -> String:
@@ -93,6 +112,12 @@ func missing_production() -> Array:
 
 func input_gateway() -> InputGateway:
 	return _gateways.get(CAPABILITY_INPUT)
+
+
+## Adapter de toque, quando a entrada esta em producao. Nulo em modo `sample` ou
+## enquanto o arquivo nao existir -- a cena cai para `input_gateway()`.
+func touch_input_gateway() -> InputGateway:
+	return _touch_gateway
 
 
 func render_gateway() -> RenderGateway:
