@@ -77,7 +77,10 @@ func test_the_phases_run_voice_wind_root_dissolve_and_done() -> void:
 	assert_eq(ReviravoltaRule.phase_for(voice, LINES), ReviravoltaRule.Phase.WIND)
 	assert_eq(ReviravoltaRule.phase_for(voice + third, LINES), ReviravoltaRule.Phase.ROOT)
 	assert_eq(ReviravoltaRule.phase_for(voice + third * 2, LINES), ReviravoltaRule.Phase.DISSOLVE)
-	assert_eq(ReviravoltaRule.phase_for(voice + ReviravoltaRule.DISSOLVE_TICKS, LINES), ReviravoltaRule.Phase.DONE)
+	assert_eq(
+		ReviravoltaRule.phase_for(voice + ReviravoltaRule.DISSOLVE_TICKS, LINES),
+		ReviravoltaRule.Phase.DONE
+	)
 	assert_eq(ReviravoltaRule.total_ticks(LINES), voice + ReviravoltaRule.DISSOLVE_TICKS)
 	assert_eq(ReviravoltaRule.phase_name(ReviravoltaRule.Phase.ROOT), "root")
 	assert_eq(ReviravoltaRule.phase_name(ReviravoltaRule.Phase.DONE), "done")

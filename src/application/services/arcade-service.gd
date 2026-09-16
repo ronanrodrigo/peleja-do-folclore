@@ -160,6 +160,16 @@ func is_arcade_complete() -> bool:
 	return index + 1 >= order.size()
 
 
+## Verdadeiro quando a Reviravolta entra em cena: a Peleja fechada foi vencida
+## pelo Oponente (regra pura em `ReviravoltaRule`). Nao encerra nada -- `advance()`
+## continua valendo e a campanha nunca acaba por derrota: quem perde uma Peleja
+## perde a Peleja, nao o arcade.
+func requires_reviravolta() -> bool:
+	if match_service == null or not match_service.is_match_over():
+		return false
+	return ReviravoltaRule.triggers(match_service.winner())
+
+
 ## Avanca um tick da Peleja corrente e devolve o retrato do arcade.
 func advance_tick() -> Dictionary:
 	if match_service != null:
