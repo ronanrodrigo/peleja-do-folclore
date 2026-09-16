@@ -38,7 +38,7 @@ var _finished_emitted: bool = false
 var _started: bool = false
 var _display: TextureRect
 var _image: Image
-var _band_image: Image
+var _band_images: Dictionary = {}
 
 
 func _ready() -> void:
@@ -170,10 +170,9 @@ func _paint_copy() -> void:
 	var model := panel_adapter.view_model(int(reviravolta_service.snapshot()["line_index"]))
 	var band: Rect2i = model["band_rect"]
 	if band.size.x > 0 and band.size.y > 0:
-		_image.blend_rect(
-			_band_image, Rect2i(Vector2i.ZERO, band.size), band.position
-		)
+		_blend_band(band, model["band_color"])
 		_paint_border(band, model["border_color"])
+	_blend_band(model["hint_band_rect"], model["hint_band_color"])
 	for prefix in ["title", "force", "line", "hint"]:
 		_paint_label(
 			str(model["%s_text" % prefix]),
@@ -181,6 +180,19 @@ func _paint_copy() -> void:
 			model["%s_color" % prefix],
 			model["%s_position" % prefix]
 		)
+
+
+## Faixa escura semitransparente: uma imagem de cor solida por tamanho, cacheada
+## porque a cena e redesenhada a cada tick.
+func _blend_band(rect: Rect2i, color: Color) -> void:
+	if rect.size.x <= 0 or rect.size.y <= 0:
+		return
+	var key := "%dx%d" % [rect.size.x, rect.size.y]
+	if not _band_images.has(key):
+		var band := Image.create_empty(rect.size.x, rect.size.y, false, Image.FORMAT_RGBA8)
+		band.fill(color)
+		_band_images[key] = band
+	_image.blend_rect(_band_images[key], Rect2i(Vector2i.ZERO, rect.size), rect.position)
 
 
 ## Contorno de 1 pixel da faixa (escrito a mao: a faixa e dado, nao um no).
@@ -229,10 +241,6 @@ func _apply_root_layout() -> void:
 func _build_display() -> void:
 	_image = Image.create_empty(BASE_WIDTH, BASE_HEIGHT, false, Image.FORMAT_RGBA8)
 	_image.fill(COLOR_CLEAR)
-	_band_image = Image.create_empty(
-		PanelAdapter.BAND_RECT.size.x, PanelAdapter.BAND_RECT.size.y, false, Image.FORMAT_RGBA8
-	)
-	_band_image.fill(PanelAdapter.COLOR_BAND)
 	_display = TextureRect.new()
 	_display.name = "ReviravoltaDisplay"
 	_display.texture = ImageTexture.create_from_image(_image)

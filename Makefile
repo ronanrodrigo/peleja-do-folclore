@@ -4,7 +4,7 @@ TEST_DIR ?= res://test
 WEB_PRESET ?= Web
 BUILD_DIR ?= build/web
 
-.PHONY: run import test lint export verify clean test-art test-audio audio capture-saci capture-cast capture-opponents capture-options
+.PHONY: run import test lint export verify clean test-art test-audio audio capture-saci capture-cast capture-opponents capture-options capture-reviravolta
 
 run:
 	$(GODOT) --path .
@@ -51,6 +51,13 @@ test-audio:
 # docs/evidence/ticket-08-*.png.
 capture-options: import
 	$(GODOT) --path . tools/capture_options.tscn -- res://docs/evidence
+
+# Print de evidencia do ticket 7: a Reviravolta disparada por uma Peleja
+# perdida de verdade -- painel de tela cheia pelo asset-gateway, sequencia de
+# texto da Forca Sobrenatural e efeitos de vento/raiz, em
+# docs/evidence/ticket-07-*.png.
+capture-reviravolta: import
+	$(GODOT) --path . tools/capture_reviravolta.tscn -- res://docs/evidence
 
 # Export web single-threaded (preset "Web" usa a variante nothreads).
 export: import

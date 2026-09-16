@@ -79,6 +79,16 @@ func test_the_band_holds_the_line_and_the_hint_stays_below() -> void:
 	)
 	assert_eq(model["line_text"], _adapter.line_text(2), "o modelo mostra a linha pedida")
 	assert_gt(int(model["hint_position"].y), band.end.y, "o comando de pular fica abaixo")
+	var hint_band: Rect2i = model["hint_band_rect"]
+	assert_true(hint_band.position.x >= 0 and hint_band.end.x <= PanelAdapter.BASE_SIZE.x)
+	assert_true(hint_band.end.y <= PanelAdapter.BASE_SIZE.y, "a faixa do comando cabe na tela")
+	assert_true(
+		hint_band.position.x <= int(model["hint_position"].x)
+		and int(model["hint_position"].x)
+		+ BitmapFont.text_width(model["hint_text"]) * int(model["hint_scale"])
+		<= hint_band.end.x,
+		"a faixa do comando envolve o texto"
+	)
 
 
 func test_the_current_line_follows_the_progress_and_never_goes_blank() -> void:

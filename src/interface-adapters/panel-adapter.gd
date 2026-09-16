@@ -36,6 +36,8 @@ const TITLE_Y := 16
 const FORCE_Y := 44
 ## Faixa escura semitransparente para a fala ficar legivel sobre a arte.
 const BAND_RECT := Rect2i(23, 116, 380, 62)
+## Folga em volta do texto dentro de uma faixa escura.
+const BAND_PADDING := 3
 const LINE_Y := 139
 const HINT_Y := 214
 
@@ -85,6 +87,7 @@ func view_model(line_index: int) -> Dictionary:
 	var shown := LINES.size() - 1
 	if line_index >= 0:
 		shown = clampi(line_index, 0, LINES.size() - 1)
+	var hint_position := centered(SKIP_HINT, HINT_SCALE, 0, BASE_SIZE.x, HINT_Y)
 	return {
 		"line_count": LINES.size(),
 		"line_index": line_index,
@@ -104,10 +107,25 @@ func view_model(line_index: int) -> Dictionary:
 		"band_color": COLOR_BAND,
 		"border_color": COLOR_BORDER,
 		"hint_text": SKIP_HINT,
-		"hint_position": centered(SKIP_HINT, HINT_SCALE, 0, BASE_SIZE.x, HINT_Y),
+		"hint_position": hint_position,
 		"hint_scale": HINT_SCALE,
 		"hint_color": COLOR_HINT,
+		## Faixa propria do comando de pular: a copy fica legivel sobre a arte.
+		"hint_band_rect": band_around(hint_position, SKIP_HINT, HINT_SCALE),
+		"hint_band_color": COLOR_BAND,
 	}
+
+
+## Faixa escura com folga em volta de um texto ja posicionado.
+static func band_around(position: Vector2i, text: String, pixel_scale: int) -> Rect2i:
+	var width := BitmapFont.text_width(text) * pixel_scale
+	var height := BitmapFont.GLYPH_HEIGHT * pixel_scale
+	return Rect2i(
+		position.x - BAND_PADDING,
+		position.y - BAND_PADDING,
+		width + BAND_PADDING * 2,
+		height + BAND_PADDING * 2
+	)
 
 
 ## Posicao que centraliza um texto (fonte bitmap 5x7) numa faixa horizontal.
