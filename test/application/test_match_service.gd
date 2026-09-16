@@ -149,6 +149,47 @@ func test_render_model_exposes_only_rectangles_and_colors() -> void:
 	assert_eq(model[0]["rect"], Rect2i(0, 0, 426, 240), "a resolucao base e 426x240")
 
 
+## O efeito proprio do Golpe Especial atravessa o caso de uso: o Redemoinho
+## consome a barra inteira e puxa o Oponente para dentro do turbilhao.
+func test_the_redemoinho_consumes_the_meter_and_pulls_the_opponent() -> void:
+	var fx := _fixture()
+	var service: MatchService = fx["service"]
+	var input: SampleInputGateway = fx["input"]
+	assert_eq(service.special_effect.display_name, SpecialMove.REDEMOINHO)
+	service.guardian.meter.gain(SpecialMeter.MAX_UNITS)
+	assert_true(service.guardian.meter.is_full(), "a barra comeca cheia")
+	var before := service.guardian.meter.current
+	assert_true(before > 0)
+	input.script_commands([InputGateway.Command.SPECIAL])
+	service.advance_tick()
+	assert_eq(service.snapshot()["special_name"], SpecialMove.REDEMOINHO)
+	assert_true(service.guardian.meter.is_empty(), "o Especial consome a Barra inteira")
+	assert_true(service.guardian.current_move.is_special(), "e o golpe entra em andamento")
+	var before_pull := service.opponent.position.x
+	var active := false
+	for tick in service.special_move.total_frames() + 1:
+		service.advance_tick()
+		if service.snapshot()["special_active"]:
+			active = true
+			break
+	assert_true(active, "a janela ativa do Redemoinho aconteceu")
+	service.advance_tick()
+	assert_lt(service.opponent.position.x, before_pull + 1, "o turbilhao puxa o Oponente para dentro")
+
+
+## Sem barra cheia o Especial nao dispara: nem gasta a barra, nem puxa ninguem.
+func test_the_special_does_not_fire_without_a_full_meter() -> void:
+	var fx := _fixture()
+	var service: MatchService = fx["service"]
+	var input: SampleInputGateway = fx["input"]
+	service.guardian.meter.gain(SpecialMeter.MAX_UNITS - 1)
+	input.script_commands([InputGateway.Command.SPECIAL])
+	service.advance_tick()
+	assert_false(service.guardian.current_move != null and service.guardian.current_move.is_special())
+	assert_eq(service.snapshot()["special_active"], false)
+	assert_eq(service.guardian.meter.current, SpecialMeter.MAX_UNITS - 1, "a barra fica intacta")
+
+
 func _run_scripted() -> Array:
 	var fx := _fixture(OpponentAi.Difficulty.HARD)
 	var service: MatchService = fx["service"]

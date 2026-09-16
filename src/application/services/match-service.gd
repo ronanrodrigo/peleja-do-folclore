@@ -49,6 +49,14 @@ const BAR_HEIGHT := 6
 const BAR_MARGIN := 8
 const METER_HEIGHT := 4
 const PIP_SIZE := 5
+## Turbilhao do Golpe Especial (Redemoinho): aneis deterministicos em volta do
+## Guardiao, sem nenhuma aleatoriedade -- o desenho e funcao da janela do golpe.
+const COLOR_WHIRLWIND := Color8(143, 224, 208)
+const COLOR_WHIRLWIND_DARK := Color8(47, 143, 134)
+const WHIRLWIND_TIERS := 4
+const WHIRLWIND_WIDTH := 64
+const WHIRLWIND_TIER_HEIGHT := 3
+const WHIRLWIND_TIER_STEP := 9
 
 var guardian: Fighter
 var opponent: Fighter
@@ -57,6 +65,8 @@ var rules: MatchRules
 var ai: OpponentAi
 var special_move: Move
 var opponent_special_move: Move
+## Efeito proprio do Golpe Especial do Guardiao (o Redemoinho do Saci puxa).
+var special_effect: SpecialMove
 var phase: int = Phase.IDLE
 var last_round_result: int = MatchRules.RoundResult.UNRESOLVED
 
@@ -95,6 +105,7 @@ func configure(
 	guardian = duel["guardian"]
 	opponent = duel["opponent"]
 	special_move = Move.special(guardian_name)
+	special_effect = SpecialMoveTable.for_guardian(guardian_name)
 	opponent_special_move = Move.special(opponent.stats.display_name)
 	ai = OpponentAi.new(difficulty)
 	rules = MatchRules.new()
@@ -160,9 +171,23 @@ func _simulate_round_tick() -> void:
 	guardian.advance_tick()
 	opponent.advance_tick()
 	_resolve_combat()
+	_apply_special_pull()
 	clock.advance(1)
 	_face_each_other()
 	_resolve_round_end()
+
+
+## Efeito proprio do Golpe Especial do Guardiao: enquanto a janela ativa do
+## Redemoinho dura, o turbilhao suga o Oponente para dentro dele. O puxao e regra
+## pura do dominio (`SpecialMove`), nao desenho.
+func _apply_special_pull() -> void:
+	if special_effect == null or guardian == null or opponent == null:
+		return
+	if guardian.current_move == null or not guardian.current_move.is_special():
+		return
+	if not guardian.is_move_active():
+		return
+	special_effect.pull_target(guardian, opponent)
 
 
 ## Executa ate o primeiro comando que muda alguma coisa; depois solta o que ficou
@@ -302,9 +327,28 @@ func render_model() -> Array:
 	model.append(_entry(Rect2i(0, GROUND_Y, STAGE_WIDTH, STAGE_HEIGHT - GROUND_Y), COLOR_GROUND))
 	model.append(_entry(_body_rect(guardian), _fighter_color(0)))
 	model.append(_entry(_body_rect(opponent), _fighter_color(1)))
+	_append_special_effect(model)
 	_append_bars(model)
 	_append_round_pips(model)
 	return model
+
+
+## Turbilhao do Redemoinho em volta do Guardiao enquanto a janela ativa do Golpe
+## Especial dura. Deterministico: a mesma janela desenha o mesmo turbilhao.
+func _append_special_effect(model: Array) -> void:
+	if guardian == null or guardian.current_move == null:
+		return
+	if not guardian.current_move.is_special() or not guardian.is_move_active():
+		return
+	var box := guardian.hurtbox()
+	var center_x := box.position.x + box.size.x / 2
+	var baseline := box.position.y + GROUND_Y
+	for tier in WHIRLWIND_TIERS:
+		var width := WHIRLWIND_WIDTH - tier * 12
+		var color := COLOR_WHIRLWIND if tier % 2 == 0 else COLOR_WHIRLWIND_DARK
+		var y := baseline + tier * WHIRLWIND_TIER_STEP
+		var rect := Rect2i(center_x - width / 2, y, width, WHIRLWIND_TIER_HEIGHT)
+		model.append(_entry(rect, color))
 
 
 func _append_bars(model: Array) -> void:
@@ -371,7 +415,17 @@ func snapshot() -> Dictionary:
 		"guardian_x": guardian.position.x if guardian != null else 0,
 		"opponent_x": opponent.position.x if opponent != null else 0,
 		"clock_seconds": clock.remaining_seconds() if clock != null else 0,
+		"special_active": _is_special_active(),
+		"special_name": special_effect.display_name if special_effect != null else "",
 	}
+
+
+## Verdadeiro enquanto a janela ativa do Golpe Especial do Guardiao dura (e o
+## efeito proprio, como o puxao do Redemoinho, esta agindo).
+func _is_special_active() -> bool:
+	if guardian == null or guardian.current_move == null:
+		return false
+	return guardian.current_move.is_special() and guardian.is_move_active()
 
 
 func _load_palette() -> Array:
