@@ -144,6 +144,19 @@ func crouch() -> bool:
 	return true
 
 
+## Puxa o lutador na direcao de um alvo, no maximo `pixels`, sem sair da arena e
+## sem passar do alvo. E o movimento do alvo sob o efeito de puxao de um Golpe
+## Especial (Redemoinho); devolve quantos pixels andou de verdade.
+func pull_towards(target_x: int, pixels: int) -> int:
+	if pixels <= 0 or target_x == position.x:
+		return 0
+	var before := position.x
+	var step := mini(pixels, absi(target_x - position.x))
+	var step_sign := 1 if target_x > position.x else -1
+	position.x = clampi(before + step * step_sign, STAGE_MIN_X, STAGE_MAX_X)
+	return absi(position.x - before)
+
+
 func stand() -> bool:
 	if not can_act():
 		return false
