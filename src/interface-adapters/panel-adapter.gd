@@ -45,8 +45,10 @@ const COLOR_TITLE := Color8(255, 211, 92)
 const COLOR_FORCE := Color8(143, 224, 208)
 const COLOR_LINE := Color8(240, 240, 255)
 const COLOR_HINT := Color8(150, 150, 190)
-## Faixa escura semitransparente: nao e `Color8` porque a faixa tem alfa.
-const COLOR_BAND := Color(6.0 / 255.0, 10.0 / 255.0, 18.0 / 255.0, 0.72)
+## Faixa escura semitransparente: nao e `Color8` porque a faixa tem alfa. O alfa
+## subiu no polimento do ticket 10: o titulo e o nome da Forca ficavam com baixo
+## contraste sobre a arte de painel (fundo claro em alguns quadros).
+const COLOR_BAND := Color(6.0 / 255.0, 10.0 / 255.0, 18.0 / 255.0, 0.82)
 const COLOR_BORDER := Color8(255, 211, 92)
 
 
@@ -88,15 +90,17 @@ func view_model(line_index: int) -> Dictionary:
 	if line_index >= 0:
 		shown = clampi(line_index, 0, LINES.size() - 1)
 	var hint_position := centered(SKIP_HINT, HINT_SCALE, 0, BASE_SIZE.x, HINT_Y)
+	var title_position := centered(TITLE_TEXT, TITLE_SCALE, 0, BASE_SIZE.x, TITLE_Y)
+	var force_position := centered(FORCE_TEXT, FORCE_SCALE, 0, BASE_SIZE.x, FORCE_Y)
 	return {
 		"line_count": LINES.size(),
 		"line_index": line_index,
 		"title_text": TITLE_TEXT,
-		"title_position": centered(TITLE_TEXT, TITLE_SCALE, 0, BASE_SIZE.x, TITLE_Y),
+		"title_position": title_position,
 		"title_scale": TITLE_SCALE,
 		"title_color": COLOR_TITLE,
 		"force_text": FORCE_TEXT,
-		"force_position": centered(FORCE_TEXT, FORCE_SCALE, 0, BASE_SIZE.x, FORCE_Y),
+		"force_position": force_position,
 		"force_scale": FORCE_SCALE,
 		"force_color": COLOR_FORCE,
 		"line_text": LINES[shown],
@@ -106,6 +110,12 @@ func view_model(line_index: int) -> Dictionary:
 		"band_rect": BAND_RECT,
 		"band_color": COLOR_BAND,
 		"border_color": COLOR_BORDER,
+		## Titulo e nome da Forca tambem ganham faixa escura: sobre a arte clara
+		## eles ficavam ilegiveis (nit de contraste do ticket 10).
+		"title_band_rect": band_around(title_position, TITLE_TEXT, TITLE_SCALE),
+		"title_band_color": COLOR_BAND,
+		"force_band_rect": band_around(force_position, FORCE_TEXT, FORCE_SCALE),
+		"force_band_color": COLOR_BAND,
 		"hint_text": SKIP_HINT,
 		"hint_position": hint_position,
 		"hint_scale": HINT_SCALE,

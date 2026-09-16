@@ -172,6 +172,8 @@ func _paint_copy() -> void:
 	if band.size.x > 0 and band.size.y > 0:
 		_blend_band(band, model["band_color"])
 		_paint_border(band, model["border_color"])
+	_blend_band(model["title_band_rect"], model["title_band_color"])
+	_blend_band(model["force_band_rect"], model["force_band_color"])
 	_blend_band(model["hint_band_rect"], model["hint_band_color"])
 	for prefix in ["title", "force", "line", "hint"]:
 		_paint_label(
