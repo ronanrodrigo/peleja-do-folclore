@@ -56,6 +56,14 @@ const FORBIDDEN_KEYS := [
 ]
 
 
+## Rotulos pt-BR dos status de Golpe Especial: o dominio conhece o nome em
+## ingles, a copy vive aqui, na borda de apresentacao.
+const STATUS_LABELS := {
+	"sleep": "SONO",
+	"invert_controls": "COMANDOS INVERTIDOS",
+}
+
+
 ## Modelo completo da tela de selecao a partir das linhas do
 ## `character-select-service`: fundo, titulo, uma coluna por Guardiao (retrato,
 ## nome, nome do Golpe Especial) e o comando de confirmacao.
@@ -111,6 +119,59 @@ func _column(row: Dictionary) -> Dictionary:
 	}
 
 
+## Modelo do HUD de uma Peleja em andamento, montado a partir do retrato do
+## `match-service`. A vida entra apenas como PROPORCAO de barra (`"bar"`), nunca
+## como numero: e o invariante da Vantagem Oculta (ADR 0003) -- o HUD mostra a
+## barra caindo, nao os numeros que a Vantagem Oculta inflou.
+func fight_model(
+	state: Dictionary, guardian_name: String, opponent_name: String
+) -> Dictionary:
+	var guardian_rounds := int(state.get("guardian_rounds", 0))
+	var opponent_rounds := int(state.get("opponent_rounds", 0))
+	return {
+		"left": _side_model(
+			guardian_name, float(state.get("guardian_health_ratio", 0.0)), guardian_rounds
+		),
+		"right": _side_model(
+			opponent_name, float(state.get("opponent_health_ratio", 0.0)), opponent_rounds
+		),
+		"round": int(state.get("round", 0)),
+		"rounds_to_win": MatchRules.ROUNDS_TO_WIN,
+		"clock_text": clock_text(int(state.get("clock_seconds", 0))),
+		"phase": str(state.get("phase", "")),
+		"special_active": bool(state.get("special_active", false)),
+		"statuses": _status_labels(state),
+	}
+
+
+## Texto do relogio do round (minutos e segundos), desenhado pela fonte bitmap.
+static func clock_text(seconds: int) -> String:
+	var remaining := maxi(seconds, 0)
+	return "%d:%02d" % [remaining / 60, remaining % 60]
+
+
+func _side_model(name_text: String, bar: float, rounds_won: int) -> Dictionary:
+	return {
+		"name": name_text,
+		"bar": clampf(bar, 0.0, 1.0),
+		"rounds_won": rounds_won,
+		"rounds_left": maxi(MatchRules.ROUNDS_TO_WIN - rounds_won, 0),
+	}
+
+
+## Status ativos dos dois lutadores como copy pt-BR; status desconhecido cai no
+## proprio nome em caixa alta, nunca some da tela em silencio.
+func _status_labels(state: Dictionary) -> Array:
+	var labels: Array = []
+	for report_key in ["guardian_status", "opponent_status"]:
+		for status in state.get(report_key, []):
+			var name_text := str(status.get("name", ""))
+			if name_text.is_empty():
+				continue
+			labels.append(str(STATUS_LABELS.get(name_text, name_text.to_upper())))
+	return labels
+
+
 ## Nome do Golpe Especial do Guardiao sob o cursor, como a HUD de luta mostra
 ## (copy pt-BR); vazio quando o Guardiao nao tem efeito cadastrado.
 static func special_label(guardian_name: String) -> String:
@@ -123,14 +184,24 @@ static func special_available(guardian_name: String) -> bool:
 
 
 ## Verdadeiro quando o modelo vaza numero da Vantagem Oculta. A HUD nunca pode
-## vazar (ADR 0003): o teste usa esta funcao como invariante.
+## vazar (ADR 0003): o teste usa esta funcao como invariante. A verificacao e
+## recursiva -- vale para o dicionario inteiro, nao so para as chaves de topo.
 func discloses_hidden_advantage(model: Dictionary) -> bool:
-	for key in model.keys():
-		if FORBIDDEN_KEYS.has(str(key)):
-			return true
-	for column in model.get("columns", []):
-		for key in column.keys():
+	return _leaks_forbidden_key(model)
+
+
+func _leaks_forbidden_key(value: Variant) -> bool:
+	if typeof(value) == TYPE_DICTIONARY:
+		var record: Dictionary = value
+		for key in record.keys():
 			if FORBIDDEN_KEYS.has(str(key)):
+				return true
+			if _leaks_forbidden_key(record[key]):
+				return true
+		return false
+	if typeof(value) == TYPE_ARRAY:
+		for item in value as Array:
+			if _leaks_forbidden_key(item):
 				return true
 	return false
 

@@ -65,6 +65,7 @@ const FONT_GLYPHS := {
 	" ": "...../...../...../...../...../...../.....",
 	"!": "..#../..#../..#../..#../..#../...../..#..",
 	"-": "...../...../...../...../.####/...../.....",
+	":": "...../..#../..#../...../..#../..#../.....",
 	".": "...../...../...../...../...../...../..#..",
 	"?": ".###./#...#/....#/...#./..#../...../..#..",
 	"_": "...../...../...../...../...../...../#####",
@@ -86,10 +87,12 @@ static func glyph_rows(character: String) -> PackedStringArray:
 
 
 ## Imagem transparente com o texto desenhado em caixa alta, escala 1 (sem
-## suavizacao: quem amplia usa `make_texture` com escala inteira).
+## suavizacao: quem amplia usa `make_texture` com escala inteira). A altura
+## acompanha o glifo mais alto do texto: `Ç` e `Õ` tem uma linha extra (cedilha e
+## til), e a imagem nao pode cortar o que a copy pt-BR pede.
 static func make_image(text: String, color: Color) -> Image:
 	var upper := text.to_upper()
-	var rows_count := GLYPH_HEIGHT
+	var rows_count := _tallest(upper)
 	var width := maxi(text_width(upper), 1)
 	var image := Image.create_empty(width, rows_count, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0, 0, 0, 0))
@@ -103,6 +106,14 @@ static func make_image(text: String, color: Color) -> Image:
 					image.set_pixel(pen_x + column, row_index, color)
 		pen_x += GLYPH_WIDTH + GLYPH_SPACING
 	return image
+
+
+## Altura do glifo mais alto do texto (7 linhas, 8 quando ha cedilha ou til).
+static func _tallest(text: String) -> int:
+	var tallest := GLYPH_HEIGHT
+	for index in text.length():
+		tallest = maxi(tallest, glyph_rows(text.substr(index, 1)).size())
+	return tallest
 
 
 ## Textura do texto em escala INTEIRA (o pixel art nunca e ampliado por fator

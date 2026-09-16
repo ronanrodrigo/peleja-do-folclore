@@ -94,3 +94,97 @@ func test_the_bitmap_font_covers_the_accented_uppercase_copy() -> void:
 	var image := BitmapFont.make_image("PEs", Color8(255, 255, 255))
 	assert_eq(image.get_height(), BitmapFont.GLYPH_HEIGHT)
 	assert_gt(image.get_width(), 0)
+	var accented := BitmapFont.make_image("FORÇA", Color8(255, 255, 255))
+	assert_eq(accented.get_height(), 8, "a imagem acompanha o glifo mais alto (cedilha)")
+	assert_eq(accented.get_width(), BitmapFont.text_width("FORÇA"), "largura do texto em pixels")
+
+
+## Peleja de verdade com adapters `sample`, so para o HUD ler o retrato real.
+func _fight_service() -> MatchService:
+	var service := MatchService.new(
+		SampleInputGateway.new(),
+		SampleRenderGateway.new(),
+		InMemoryAssetGateway.new(),
+		SilentAudioGateway.new()
+	)
+	service.configure(GuardianStats.SACI, Archetype.Id.CAPATAZ, 11, 22)
+	return service
+
+
+## Procura uma chave proibida em qualquer nivel do modelo (dicionario ou lista).
+func _leaks(value: Variant, key: String) -> bool:
+	if typeof(value) == TYPE_DICTIONARY:
+		var record: Dictionary = value
+		for candidate in record.keys():
+			if str(candidate) == key or _leaks(record[candidate], key):
+				return true
+		return false
+	if typeof(value) == TYPE_ARRAY:
+		for item in value as Array:
+			if _leaks(item, key):
+				return true
+	return false
+
+
+func test_the_fight_hud_shows_names_bars_and_rounds_of_a_real_match() -> void:
+	var service := _fight_service()
+	var model := _adapter.fight_model(service.snapshot(), GuardianStats.SACI, "Oponente")
+	assert_eq(model["left"]["name"], GuardianStats.SACI)
+	assert_eq(model["right"]["name"], "Oponente")
+	assert_almost_eq(float(model["left"]["bar"]), 1.0, 0.01, "barra cheia no inicio do round")
+	assert_eq(int(model["left"]["rounds_won"]), 0)
+	assert_eq(int(model["left"]["rounds_left"]), MatchRules.ROUNDS_TO_WIN)
+	assert_eq(int(model["rounds_to_win"]), MatchRules.ROUNDS_TO_WIN)
+	assert_eq(model["phase"], "round_active")
+	assert_eq(model["clock_text"], "1:00")
+
+
+func test_the_fight_hud_never_discloses_the_hidden_advantage() -> void:
+	var service := _fight_service()
+	# A Vantagem Oculta e verdadeira: o Guardiao tem mais vida e mais dano.
+	assert_gt(
+		service.guardian.stats.max_health,
+		service.opponent.stats.max_health,
+		"o Guardiao tem mais vida que o Oponente"
+	)
+	assert_gt(
+		service.guardian.stats.damage_multiplier,
+		service.opponent.stats.damage_multiplier,
+		"e mais dano"
+	)
+	var model := _adapter.fight_model(service.snapshot(), GuardianStats.SACI, "Oponente")
+	assert_false(
+		_adapter.discloses_hidden_advantage(model),
+		"o HUD da luta nao expoe vida, dano nem a vantagem"
+	)
+	for forbidden in HudAdapter.FORBIDDEN_KEYS:
+		assert_false(_leaks(model, forbidden), "%s nao aparece em nivel nenhum" % forbidden)
+	var updated := service.snapshot()
+	updated["guardian_health_ratio"] = 0.42
+	var partial := _adapter.fight_model(updated, GuardianStats.SACI, "Oponente")
+	assert_almost_eq(float(partial["left"]["bar"]), 0.42, 0.001, "a barra so mostra a proporcao")
+	assert_false(_adapter.discloses_hidden_advantage(partial))
+
+
+func test_the_fight_hud_labels_the_special_statuses_in_portuguese() -> void:
+	var state := {
+		"guardian_status": [{"name": "invert_controls", "ticks": 120}],
+		"opponent_status": [{"name": "sleep", "ticks": 40}],
+	}
+	var model := _adapter.fight_model(state, GuardianStats.SACI, "Oponente")
+	assert_eq(model["statuses"], ["COMANDOS INVERTIDOS", "SONO"])
+	assert_false(_adapter.discloses_hidden_advantage(model))
+
+
+func test_the_clock_and_the_status_copy_have_glyphs_in_the_bitmap_font() -> void:
+	assert_eq(HudAdapter.clock_text(60), "1:00")
+	assert_eq(HudAdapter.clock_text(0), "0:00")
+	assert_eq(HudAdapter.clock_text(-4), "0:00", "relogio nunca fica negativo")
+	var texts := [HudAdapter.clock_text(125), HudAdapter.STATUS_LABELS["sleep"]]
+	texts.append(HudAdapter.STATUS_LABELS["invert_controls"])
+	for text in texts:
+		for index in text.length():
+			assert_true(
+				BitmapFont.FONT_GLYPHS.has(text.substr(index, 1)),
+				"glifo proprio para todo caractere de '%s'" % text
+			)
