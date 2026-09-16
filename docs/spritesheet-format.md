@@ -149,6 +149,43 @@ python3 tools/art/build_saci_spritesheet.py --preview /tmp/saci.png   # inspeç�
 make capture-saci                                          # prints de evidência
 ```
 
+## Os 7 Oponentes do arcade (`assets/spritesheets/<slug>.json`)
+
+Os sete Arquétipos satíricos do ADR 0004 **reusam este mesmo formato** — não há
+formato próprio de Oponente: mesma paleta e matrizes de pixel, as dez animações
+obrigatórias (`REQUIRED_ANIMATIONS`) e o mesmo contrato de quadro por animação da
+tabela do Saci acima (24x34 no corpo, 26x20 agachado, 32x34 no pesado, 40x40 no
+Golpe Especial e 34x20 no nocaute). O que muda é o dado: paleta, silhueta e
+trejeito de cada um.
+
+O gerador é `tools/art/build_opponent_spritesheets.py`, que estende o padrão de
+`tools/art/build_saci_spritesheet.py` (a mesma `Grid`, os mesmos auxiliares de
+retângulo/linha/contorno). O JSON é commitado e é a fonte de verdade, validada
+por `test/infrastructure/test_opponent_spritesheets.gd`.
+
+| # | Slug | Arquétipo | Marca visual (arte codificada) | Golpe próprio |
+| --- | --- | --- | --- | --- |
+| 1 | `capataz` | O Capataz | chapéu de aba larga, bigode, chicote; capangas no quadro do golpe | Chicote Largo |
+| 2 | `banqueiro` | O Banqueiro | cartola, terno verde, gravata e moedas; a barra sobe | Juros Compostos |
+| 3 | `redpill` | O Redpill | boné, óculos escuros e capuz; spray de pílula vermelha no golpe | Spray de Pílula |
+| 4 | `camisa-verde` | O Camisa-Verde | camisa verde e **braçadeira lisa** (sem emblema); gaita de marcha | Gaita de Marcha |
+| 5 | `doutor-pureza` | O Doutor Pureza | jaleco branco, óculos redondos; dreno de uma silhueta cinza neutra | Teoria Drenante |
+| 6 | `fantasma-do-reich` | O Fantasma do Reich | espectro cinza **sem pernas** (cauda espectral), uniforme liso | Vento de Cinzas |
+| 7 | `falso-pastor` | O Falso Pastor | terno e microfone; prato de coleta e auréola desenhada | Dízimo |
+
+A política do ADR 0004 vale para a arte: nenhum Arquétipo usa pessoa real, símbolo
+real de organização histórica ou criminosa, nem referência a religião. A
+braçadeira do Camisa-Verde é uma faixa sólida e o Fantasma não carrega insígnia
+alguma; o Falso Pastor mira o charlatão (o dízimo e o "milagre" comprado), nunca
+a fé.
+
+```bash
+python3 tools/art/build_opponent_spritesheets.py                       # regrava os 7 JSON
+python3 tools/art/build_opponent_spritesheets.py --preview /tmp/o.png --slug capataz
+python3 tools/art/build_opponent_spritesheets.py --preview-all /tmp/opponents
+make capture-opponents                                                 # prints de evidência
+```
+
 ## Adicionar um lutador novo
 
 1. Escreva `assets/spritesheets/<slug>.json` com as dez animações obrigatórias

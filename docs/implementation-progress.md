@@ -416,3 +416,79 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
 - `match-service.gd` e `special_move_table.gd` foram alterados de forma aditiva e
   localizada (efeito no fim da funcao, `_effect_for_roster` no fim do arquivo)
   porque os tickets 6 e 8 rodam em paralelo sobre esses mesmos arquivos.
+
+## Ticket 6 — Os 7 arquetipos do poder
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `tools/art/build_opponent_spritesheets.py`: gerador (fronteira de autoria, fora
+  das camadas do jogo) que estende o padrao do gerador do Saci e emite os sete
+  spritesheets codificados. Cada Oponente tem paleta de 11 a 15 cores, silhueta e
+  trejeito proprios e as dez animacoes obrigatorias (23 frames, mesmo contrato de
+  quadro do ticket 4).
+- `assets/spritesheets/{capataz,banqueiro,redpill,camisa-verde,doutor-pureza,fantasma-do-reich,falso-pastor}.json`:
+  a arte dos 7 Oponentes como **dado versionado** (nenhum PNG binario de lutador),
+  validada por teste contra o arquivo real.
+- `src/domain/opponent_profile.gd`: o perfil de cada Arquetipo como dado -- slug
+  da aparencia, golpe-assinatura (Chicote Largo, Juros Compostos, Spray de Pilula,
+  Gaita de Marcha, Teoria Drenante, Vento de Cinzas e Dizimo), a janela do golpe
+  e o ajuste de IA que distingue um Oponente do outro.
+- `src/domain/meter_steal_move.gd`: os golpes que roubam a Barra de Especial
+  (Banqueiro e Falso Pastor). Como o Golpe Especial exige a barra **cheia**, o
+  roubo adia o Especial do Guardiao sem regra nova no `Fighter`.
+- `src/domain/opponent_ai.gd`: a acao `SIGNATURE` e `apply_overrides`, que mescla
+  o ajuste do Arquetipo sobre uma **copia** do perfil do nivel (o dado
+  compartilhado de dificuldade fica intacto, coberto por teste).
+- `src/domain/special_meter.gd`: `drain()`, por adicao, para a barra ceder
+  unidades ao roubo.
+- `src/application/services/arcade-service.gd`: as 7 Pelejas em ordem **fixa que
+  chega como dado** do chamador (ADR 0007), escada de dificuldade como dado e o
+  Guardiao recebido por parametro/comando (`select_guardian`) -- sem depender do
+  `character-select-service` (ticket 5); a comunicacao e por dado.
+- `src/application/services/match-service.gd`: aplica o golpe-assinatura da IA,
+  resolve o roubo de barra no contato e expoe perfil, slug e golpe proprio no
+  `snapshot()` (mudancas aditivas e localizadas).
+- Testes novos: `test/domain/test_opponent_profile.gd` (13),
+  `test/domain/test_meter_steal.gd` (7), `test/application/test_arcade_service.gd`
+  (10) e `test/infrastructure/test_opponent_spritesheets.gd` (9) -- 39 testes.
+- `tools/capture_opponents.gd` + `.tscn` e o alvo `make capture-opponents`:
+  ferramenta de evidencia que desenha os 7 pelo renderer de producao.
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo **0**: gdlint `Success: no problems found`; GUT
+  headless `278/278` testes e `170221` asserts com `-gexit` (eram 239 testes no
+  ticket 4: esta fatia acrescenta 39); export web gerou `index.html`, `index.js`,
+  `index.pck` e `index.wasm` (`39514754` bytes, a variante single-threaded).
+- `make capture-opponents` sai com codigo 0 e grava 7 prints 426x240 em
+  `docs/evidence/ticket-06-<slug>.png`, um por Oponente, cada um com o corpo
+  parado, o passo, a guarda, o golpe pesado, o **golpe proprio** e o nocaute
+  desenhados em escala inteira 3x.
+- Ordem fixa verificada contra o dado: o teste compara a sequencia enfrentada com
+  `ArcadeOrder`/`Archetype.slugs()` posicao a posicao, prova que a ordem injetada
+  pelo chamador e obedecida (e recusa ordem incompleta ou com repeticao) e que a
+  dificuldade nao desce e a vida do Oponente cresce ao longo das 7 Pelejas.
+- Roubo de barra no dominio com teste: os dois Arquetipos da cobranca tiram a
+  barra no contato (25 e 20 unidades), o roubo so leva o que existia, nunca
+  inverte a barra, passa o valor para quem cobrou e adia o Especial do Guardiao;
+  os outros cinco nao roubam nada.
+- Politica do ADR 0004 revisada no dado, com teste: nenhum nome de Arquetipo ou de
+  golpe cita pessoa real, simbolo real ou religiao (lista de termos proibidos), e
+  toda arte segue a mesma regra.
+
+**Dividas assumidas nesta fatia**
+
+- O `arcade-service` esta completo no dominio/aplicacao, mas a navegacao
+  titulo -> arcade -> Reviravolta e o HUD do arcade entram nos tickets 7 e 10.
+- O `character-select-service` (ticket 5) entrega a escolha como dado; aqui ela
+  entra por `execute(order, guardian_name)`/`select_guardian` -- a ligacao das
+  cenas fica no polimento.
+- A arte dos Oponentes e autoral e determinIstica (ticket 4/ADR 0005); o Golpe
+  Especial deles continua usando a moldura comum (`Move.special`), com o efeito
+  proprio do Guardiao no `SpecialMoveTable`.
+- `src/domain/archetype.gd` e `src/domain/special_move_table.gd` NAO foram
+  tocados nesta fatia: os dados dos Oponentes vivem nos arquivos novos
+  (`opponent_profile.gd`, `meter_steal_move.gd`), o que evita conflito com os
+  tickets 5 e 8, que rodam em paralelo e tambem escrevem nesses arquivos.
