@@ -22,6 +22,7 @@ const EXPECTED_FILES := [
 	"move.gd",
 	"opponent_ai.gd",
 	"opponent_stats.gd",
+	"reviravolta_rule.gd",
 	"rng.gd",
 	"round_clock.gd",
 	"special_meter.gd",
