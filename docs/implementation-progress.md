@@ -234,3 +234,86 @@ evidencia do ADR 0006) -- nunca "pronto" declarado.
   Arquetipo (ataques que roubam barra, perfis distintos) entra no ticket 6.
 - A cena de luta roda sozinha (`godot --path . scenes/fight.tscn`); a navegacao
   titulo -> luta e o retorno de vitoria/derrota entram no polimento (ticket 10).
+
+## Ticket 4 — Spritesheet codificado e Saci
+
+**Estado:** fechado.
+
+**Entregue**
+
+- `docs/spritesheet-format.md`: o formato codificado fixado e documentado —
+  caminho, chaves de topo, codificacao de `pixels` (lista plana, lista de linhas
+  e linhas em texto compacto na base 36), regras de validacao, regra de escala
+  inteira/nearest/letterbox, a tabela do Saci (frames e quadros por animacao) e
+  como adicionar um lutador novo.
+- `src/domain/spritesheet.gd` (extensao por adicao): `PIXEL_CHARS` e
+  `TRANSPARENT_CHAR` (linha compacta, um caractere por pixel), `decode_problems`
+  (caractere invalido vira problema reportado, nao pixel silencioso),
+  `pixel_at`, `row_pixels` e `pixel_color` para o renderer ler a matriz. O
+  contrato anterior nao mudou: `decode`, `errors()` e `REQUIRED_ANIMATIONS`
+  seguem os mesmos.
+- `assets/spritesheets/saci.json`: a arte do Saci como **dado versionado** (12
+  cores de paleta, 10 animacoes, 23 frames, 29455 bytes de JSON) — nenhum PNG
+  binario de lutador no repositorio.
+- `src/interface-adapters/sprite-render-adapter.gd`: renderer de producao.
+  Desenha a resolucao base 426x240 num `Image` RGBA8 e apresenta num `TextureRect`
+  com filtro **nearest** e escala **inteira** (3x), com letterbox calculado por
+  `display_scale()`/`letterbox_rect()`; escala invalida e recusada e registrada
+  em `rejected_scales`, nunca desenhada borrada.
+- `src/application/gateways/render-gateway.gd`: contrato ganha
+  `draw_sprite(sheet, animacao, frame, origem, escala, flip)`,
+  `DEFAULT_PIXEL_SCALE` (3) e `BASE_SIZE` (426x240), por adicao.
+- `src/infrastructure/godot-asset-gateway.gd`: `load_spritesheet(slug)` deixa de
+  devolver vazio e passa a ler `assets/spritesheets/<slug>.json`
+  (`spritesheet_path`, `has_spritesheet`, `exists` reconhece o slug).
+- `src/domain/special_move.gd` + `special_move_table.gd`: o efeito proprio do
+  Golpe Especial como dado puro. O **Redemoinho** do Saci puxa o Oponente 3
+  pixels por tick de janela ativa, num alcance de 72 pixels.
+- `src/domain/fighter.gd`: `pull_towards(alvo, pixels)` — o puxao nunca passa do
+  alvo nem sai da arena.
+- `src/application/services/match-service.gd`: aplica o puxao na janela ativa do
+  Especial, desenha o turbilhao em `render_model()` e expoe `special_active` e
+  `special_name` no `snapshot()`.
+- `tools/art/build_saci_spritesheet.py`: fronteira de autoria (fora das camadas do
+  jogo) que desenha o Saci com primitivas e emite o JSON; `--preview` gera um PNG
+  de inspecao.
+- `tools/capture_saci.gd` + `.tscn` e o alvo `make capture-saci`: ferramenta de
+  evidencia que desenha cada animacao pelo renderer de producao e grava um PNG em
+  `docs/evidence/`.
+- Testes: `test/domain/test_spritesheet_encoding.gd`,
+  `test/domain/test_special_move.gd`, `test/infrastructure/test_spritesheet_asset.gd`,
+  `test/interface_adapters/test_sprite_render_adapter.gd`, dois casos novos em
+  `test/application/test_match_service.gd` e os ajustes de `test/smoke/test_app_container.gd`
+  (a capacidade `render` agora tem adapter de producao e cai para `sample` se e
+  somente se o arquivo nao existir).
+
+**Evidencia de fechamento**
+
+- `make verify` sai com codigo 0: gdlint `Success: no problems found`; GUT
+  headless `239/239` testes e `23132` asserts com `-gexit` (eram 197 testes no
+  ticket 3: esta fatia acrescenta 42); export web gerou `index.html`, `index.js`,
+  `index.pck` e `index.wasm` (`39514754` bytes, a variante single-threaded).
+- `make capture-saci` sai com codigo 0 e grava 10 prints 426x240 em
+  `docs/evidence/ticket-04-saci-<animacao>.png` (23 frames, escala 3x), um por
+  animacao exigida: o Saci de uma perna, gorro vermelho e cachimbo, e o
+  Redemoinho com o Saci dentro do turbilhao.
+- O formato e validado contra a arte real: paleta dentro do maximo, matriz
+  completa em todos os 23 frames, indice de pixel sempre dentro da paleta,
+  dimensoes e contagem de frames por animacao iguais ao documentado, e nenhuma
+  imagem binaria em `assets/spritesheets/`.
+- Escala: `display_scale` e testada com varias janelas (1278x720 -> 3x,
+  900x500 -> 2x, 400x300 -> 1x) e o letterbox centraliza a sobra; escala 0 ou
+  negativa e recusada pela render-gateway (o fator fracionario nao existe na API,
+  que so aceita inteiro).
+- O Redemoinho consome a Barra de Especial inteira e so dispara com a barra
+  cheia, no dominio (`Fighter.start_special`) e no caso de uso (`match-service`).
+
+**Dividas assumidas nesta fatia**
+
+- O desenho dos lutadores na cena de luta ainda e o `render_model()` de
+  retangulos: o `sprite-render-adapter` desenha spritesheets quando chamado
+  (`draw_sprite`) e a cena passa a compor os dois no polimento (ticket 10).
+- Os efeitos proprios dos outros tres Guardioes entram no ticket 5 por adicao em
+  `SpecialMoveTable` (o Saci e o unico com efeito cadastrado aqui).
+- `heavy` usa um quadro mais largo (32x34) que as demais animacoes de corpo: e o
+  formato permitindo quadro por animacao, nao um caso especial no renderer.
